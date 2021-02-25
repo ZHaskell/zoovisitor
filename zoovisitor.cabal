@@ -1,0 +1,61 @@
+cabal-version:      2.2
+name:               zoovisitor
+version:            0.1.0.0
+synopsis:
+  A haskell binding to Apache Zookeeper C library(mt) using Haskell Z project.
+
+description:
+  Please see the README on Github at <https://github.com/ZHaskell/zoovisitor#readme>
+
+license:            BSD-3-Clause
+license-file:       LICENSE
+copyright:          Copyright (c)
+author:             mu
+maintainer:         mu@laxcat.xyz
+tested-with:        GHC ==8.6.5 || ==8.8.4 || ==8.10.3
+category:           Database
+homepage:           https://github.com/ZHaskell/zoovisitor
+bug-reports:        https://github.com/ZHaskell/zoovisitor/issues
+build-type:         Simple
+extra-source-files:
+  ChangeLog.md
+  README.md
+
+source-repository head
+  type:     git
+  location: https://github.com/ZHaskell/zoovisitor
+
+library
+  hs-source-dirs:   src
+  exposed-modules:  Lib
+  build-depends:    base >=4.11 && <5
+  default-language: Haskell2010
+  ghc-options:
+    -Wall -Wcompat -Widentities -Wincomplete-record-updates
+    -Wincomplete-uni-patterns -Wpartial-fields -Wredundant-constraints
+
+executable zoovisitor
+  hs-source-dirs:   app
+  main-is:          Main.hs
+  build-depends:    base >=4.11 && <5
+  default-language: Haskell2010
+  ghc-options:
+    -Wall -Wcompat -Widentities -Wincomplete-record-updates
+    -Wincomplete-uni-patterns -Wpartial-fields -Wredundant-constraints
+    -threaded -rtsopts -with-rtsopts=-N
+
+test-suite zoovisitor-test
+  type:               exitcode-stdio-1.0
+  main-is:            Spec.hs
+  hs-source-dirs:     test
+  build-depends:
+    , base        >=4.11 && <5
+    , hspec
+    , zoovisitor
+
+  default-language:   Haskell2010
+  build-tool-depends: hspec-discover:hspec-discover ==2.*
+  ghc-options:
+    -Wall -Wcompat -Widentities -Wincomplete-record-updates
+    -Wincomplete-uni-patterns -Wpartial-fields -Wredundant-constraints
+    -threaded -rtsopts -with-rtsopts=-N
