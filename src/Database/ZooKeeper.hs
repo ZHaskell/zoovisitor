@@ -61,11 +61,7 @@ zookeeperResInit host timeout mclientid flags =
   Res.initResource (zookeeperInit host timeout mclientid flags) zookeeperClose
 
 zooCreate :: HasCallStack
-          => T.ZHandle
-          -> CBytes
-          -> Bytes
-          -> T.AclVector
-          -> T.CreateMode
+          => T.ZHandle -> CBytes -> Bytes -> T.AclVector -> T.CreateMode
           -> (T.StringCompletion -> IO ())
           -> IO ()
 zooCreate zh path value acl (I.CreateMode mode) f =
@@ -73,46 +69,52 @@ zooCreate zh path value acl (I.CreateMode mode) f =
   Z.withPrimVectorUnsafe value $ \val' offset len -> mask_ $ do
     mvar <- newEmptyMVar
     sp <- newStablePtrPrimMVar mvar
-    result <- mallocForeignPtrBytes I.stringCompletionSize
-    result' <- withForeignPtr result $ \resultPtr -> do
+    fp <- mallocForeignPtrBytes I.stringCompletionSize
+    result <- withForeignPtr fp $ \data' -> do
       (cap, _) <- threadCapability =<< myThreadId
-      void $ E.throwZooErrorIfNotOK =<< I.c_hs_zoo_acreate sp cap resultPtr zh path' val' offset len acl mode
-      takeMVar mvar `onException` forkIO (do takeMVar mvar; touchForeignPtr result)
-      result' <- I.peekStringCompletion resultPtr
-      void . E.throwZooErrorIfNotOK $ I.strCompletionRetCode result'
-      return result'
-    f result'
+      void $ E.throwZooErrorIfNotOK =<< I.c_hs_zoo_acreate sp cap data' zh path' val' offset len acl mode
+      takeMVar mvar `onException` forkIO (do takeMVar mvar; touchForeignPtr fp)
+      I.peekStringCompletion data'
+    -- check string completion return code
+    void $ E.throwZooErrorIfNotOK $ I.strCompletionRetCode result
+    f result
 
-zooSet :: HasCallStack => T.ZHandle -> CBytes -> Bytes -> CInt -> (I.StatCompletion -> IO ()) -> IO ()
+zooSet :: HasCallStack
+       => T.ZHandle -> CBytes -> Bytes -> CInt
+       -> (I.StatCompletion -> IO ())
+       -> IO ()
 zooSet zh path value version f =
   CBytes.withCBytesUnsafe path $ \path' ->
   Z.withPrimVectorUnsafe value $ \val' offset len -> mask_ $ do
     mvar <- newEmptyMVar
     sp <- newStablePtrPrimMVar mvar
-    result <- mallocForeignPtrBytes I.statCompletionSize
-    cbResult <- withForeignPtr result $ \result' -> do
+    fp <- mallocForeignPtrBytes I.statCompletionSize
+    result <- withForeignPtr fp $ \data' -> do
       (cap, _) <- threadCapability =<< myThreadId
-      void $ E.throwZooErrorIfNotOK =<< I.c_hs_zoo_aset sp cap result' zh path' val' offset len version
-      takeMVar mvar `onException` forkIO (do takeMVar mvar; touchForeignPtr result)
-      I.peekStatCompletion result'
-    f cbResult
+      void $ E.throwZooErrorIfNotOK =<< I.c_hs_zoo_aset sp cap data' zh path' val' offset len version
+      takeMVar mvar `onException` forkIO (do takeMVar mvar; touchForeignPtr fp)
+      I.peekStatCompletion data'
+    -- check stat completion return code
+    void $ E.throwZooErrorIfNotOK $ I.statCompletionRetCode result
+    f result
 
 zooGet :: HasCallStack
-       => T.ZHandle
-       -> CBytes
+       => T.ZHandle -> CBytes
        -> (T.DataCompletion -> IO ())
        -> IO ()
 zooGet zh path f =
   CBytes.withCBytesUnsafe path $ \path' -> mask_ $ do
     mvar <- newEmptyMVar
     sp <- newStablePtrPrimMVar mvar
-    result <- mallocForeignPtrBytes I.dataCompletionSize
-    cbResult <- withForeignPtr result $ \result' -> do
+    fp <- mallocForeignPtrBytes I.dataCompletionSize
+    result <- withForeignPtr fp $ \data' -> do
       (cap, _) <- threadCapability =<< myThreadId
-      void $ E.throwZooErrorIfNotOK =<< I.c_hs_zoo_aget sp cap result' zh path' False
-      takeMVar mvar `onException` forkIO (do takeMVar mvar; touchForeignPtr result)
-      I.peekDataCompletion result'
-    f cbResult
+      void $ E.throwZooErrorIfNotOK =<< I.c_hs_zoo_aget sp cap data' zh path' False
+      takeMVar mvar `onException` forkIO (do takeMVar mvar; touchForeignPtr fp)
+      I.peekDataCompletion data'
+    -- check stat completion return code
+    void $ E.throwZooErrorIfNotOK $ I.dataCompletionRetCode result
+    f result
 
 -------------------------------------------------------------------------------
 
