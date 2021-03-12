@@ -123,25 +123,24 @@ zhandle_t* hs_zookeeper_init(HsStablePtr mvar, HsInt cap,
   return zh;
 }
 
-int hs_zoo_acreate(HsStablePtr mvar, HsInt cap,
-                   hs_string_completion_t* string_completion, zhandle_t* zh,
-                   const char* path, const char* value, int offset,
-                   int valuelen, const struct ACL_vector* acl, int mode) {
+int hs_zoo_acreate(zhandle_t* zh, const char* path, const char* value,
+                   int offset, int valuelen, const struct ACL_vector* acl,
+                   int mode, HsStablePtr mvar, HsInt cap,
+                   hs_string_completion_t* string_completion) {
   string_completion->mvar = mvar;
   string_completion->cap = cap;
   return zoo_acreate(zh, path, value + offset, valuelen, acl, mode,
                      hs_string_completion_fn, string_completion);
 }
 
-int hs_zoo_aget(HsStablePtr mvar, HsInt cap,
-                hs_data_completion_t* data_completion, zhandle_t* zh,
-                const char* path, int watch) {
+int hs_zoo_aget(zhandle_t* zh, const char* path, int watch, HsStablePtr mvar,
+                HsInt cap, hs_data_completion_t* data_completion) {
   data_completion->mvar = mvar;
   data_completion->cap = cap;
   return zoo_aget(zh, path, watch, hs_data_completion_fn, data_completion);
 }
 
-/**
+/** zoo_aset
  * \brief sets the data associated with a node.
  *
  * \param zh the zookeeper handle obtained by a call to \ref zookeeper_init
@@ -165,10 +164,9 @@ int hs_zoo_aget(HsStablePtr mvar, HsInt cap,
  * ZOO_SESSION_EXPIRED_STATE or ZOO_AUTH_FAILED_STATE ZMARSHALLINGERROR - failed
  * to marshall a request; possibly, out of memory
  */
-int hs_zoo_aset(HsStablePtr mvar, HsInt cap,
-                hs_stat_completion_t* stat_completion, zhandle_t* zh,
-                const char* path, const char* buffer, int offset, int buflen,
-                int version) {
+int hs_zoo_aset(zhandle_t* zh, const char* path, const char* buffer, int offset,
+                int buflen, int version, HsStablePtr mvar, HsInt cap,
+                hs_stat_completion_t* stat_completion) {
   stat_completion->mvar = mvar;
   stat_completion->cap = cap;
   return zoo_aset(zh, path, buffer + offset, buflen, version,

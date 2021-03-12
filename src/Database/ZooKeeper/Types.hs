@@ -12,7 +12,8 @@ module Database.ZooKeeper.Types
 
   , I.StringCompletion (..)
   , I.DataCompletion (..)
-  , I.VoidCompletion (..)
+  , I.StatCompletion (..)
+  , I.VoidCompletion
 
   , I.CreateMode
   , pattern I.ZooPersistent

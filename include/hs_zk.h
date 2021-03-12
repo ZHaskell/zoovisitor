@@ -60,19 +60,17 @@ zhandle_t* hs_zookeeper_init(HsStablePtr mvar, HsInt cap,
                              int recv_timeout, const clientid_t* clientid,
                              int flags);
 
-int hs_zoo_acreate(HsStablePtr mvar, HsInt cap,
-                   hs_string_completion_t* string_completion, zhandle_t* zh,
-                   const char* path, const char* value, int offset,
-                   int valuelen, const struct ACL_vector* acl, int mode);
+int hs_zoo_acreate(zhandle_t* zh, const char* path, const char* value,
+                   int offset, int valuelen, const struct ACL_vector* acl,
+                   int mode, HsStablePtr mvar, HsInt cap,
+                   hs_string_completion_t* string_completion);
 
-int hs_zoo_aget(HsStablePtr mvar, HsInt cap,
-                hs_data_completion_t* data_completion, zhandle_t* zh,
-                const char* path, int watch);
+int hs_zoo_aget(zhandle_t* zh, const char* path, int watch, HsStablePtr mvar,
+                HsInt cap, hs_data_completion_t* data_completion);
 
-int hs_zoo_aset(HsStablePtr mvar, HsInt cap,
-                hs_stat_completion_t* stat_completion, zhandle_t* zh,
-                const char* path, const char* buffer, int offset, int buflen,
-                int version);
+int hs_zoo_aset(zhandle_t* zh, const char* path, const char* buffer, int offset,
+                int buflen, int version, HsStablePtr mvar, HsInt cap,
+                hs_stat_completion_t* stat_completion);
 
 int hs_zoo_adelete(zhandle_t* zh, const char* path, int version,
                    HsStablePtr mvar, HsInt cap,

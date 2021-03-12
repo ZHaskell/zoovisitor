@@ -3,13 +3,14 @@
 module Database.ZooKeeper.Internal.Types where
 
 import           Data.Int
+import           Data.Proxy    (Proxy (..))
 import           Foreign
 import           Foreign.C
-import           Z.Data.CBytes   (CBytes)
-import qualified Z.Data.CBytes   as CBytes
-import qualified Z.Data.Text     as Text
-import           Z.Data.Vector   (Bytes)
-import qualified Z.Foreign       as Z
+import           Z.Data.CBytes (CBytes)
+import qualified Z.Data.CBytes as CBytes
+import qualified Z.Data.Text   as Text
+import           Z.Data.Vector (Bytes)
+import qualified Z.Foreign     as Z
 
 #include "hs_zk.h"
 
@@ -185,63 +186,56 @@ peekHsWatcherCtx ptr = do
   path <- CBytes.fromCString path_ptr   -- NOT responsible for freeing value?
   return $ HsWatcherCtx (ZHandle zh_ptr) event_type (ZooState connect_state) path
 
-data StringCompletion = StringCompletion
-  { strCompletionRetCode :: CInt
-  , strCompletionValue   :: CBytes
-  } deriving Show
+class Completion a where
+  {-# MINIMAL csize, peekRet, peekData #-}
+  csize :: Proxy a -> Int
+  peekRet :: Ptr a -> IO CInt
+  peekData :: Ptr a -> IO a
 
-stringCompletionSize :: Int
-stringCompletionSize = (#size hs_string_completion_t)
+newtype StringCompletion = StringCompletion { strCompletionValue :: CBytes }
+  deriving Show
 
-peekStringCompletion :: Ptr StringCompletion -> IO StringCompletion
-peekStringCompletion ptr = do
-  rc <- (#peek hs_string_completion_t, rc) ptr
-  value_ptr <- (#peek hs_string_completion_t, value) ptr
-  value <- CBytes.fromCString value_ptr   -- NOT responsible for freeing value?
-  return $ StringCompletion rc value
+instance Completion StringCompletion where
+  csize _ = (#size hs_string_completion_t)
+  peekRet ptr = (#peek hs_string_completion_t, rc) ptr
+  peekData ptr = do
+    value_ptr <- (#peek hs_string_completion_t, value) ptr
+    value <- CBytes.fromCString value_ptr <* free value_ptr
+    return $ StringCompletion value
 
 data DataCompletion = DataCompletion
-  { dataCompletionRetCode :: CInt
-  , dataCompletionValue   :: Bytes
+  { dataCompletionValue   :: Bytes
   , dataCompletionStat    :: Stat
   } deriving Show
 
-dataCompletionSize :: Int
-dataCompletionSize = (#size hs_data_completion_t)
+instance Completion DataCompletion where
+  csize _ = (#size hs_data_completion_t)
+  peekRet ptr = (#peek hs_data_completion_t, rc) ptr
+  peekData ptr = do
+    val_ptr <- (#peek hs_data_completion_t, value) ptr
+    val_len :: CInt <- (#peek hs_data_completion_t, value_len) ptr
+    val <- Z.fromPtr val_ptr (fromIntegral val_len) <* free val_ptr
+    stat_ptr <- (#peek hs_data_completion_t, stat) ptr
+    stat <- peekStat stat_ptr <* free stat_ptr
+    return $ DataCompletion val stat
 
-peekDataCompletion :: Ptr DataCompletion -> IO DataCompletion
-peekDataCompletion ptr = do
-  rc <- (#peek hs_data_completion_t, rc) ptr
-  val_ptr <- (#peek hs_data_completion_t, value) ptr
-  val_len :: CInt <- (#peek hs_data_completion_t, value_len) ptr
-  val <- Z.fromPtr val_ptr (fromIntegral val_len) <* free val_ptr
-  stat_ptr <- (#peek hs_data_completion_t, stat) ptr
-  stat <- peekStat stat_ptr <* free stat_ptr
-  return $ DataCompletion rc val stat
+newtype StatCompletion = StatCompletion { statCompletionStat :: Stat }
+  deriving Show
 
-data StatCompletion = StatCompletion
-  { statCompletionRetCode :: CInt
-  , statCompletionStat    :: Stat
-  } deriving (Show, Eq)
+instance Completion StatCompletion where
+  csize _ = (#size hs_stat_completion_t)
+  peekRet ptr = (#peek hs_stat_completion_t, rc) ptr
+  peekData ptr = do
+    stat_ptr <- (#peek hs_stat_completion_t, stat) ptr
+    stat <- peekStat stat_ptr <* free stat_ptr
+    return $ StatCompletion stat
 
-statCompletionSize :: Int
-statCompletionSize = (#size hs_stat_completion_t)
+newtype VoidCompletion = VoidCompletion ()
 
-peekStatCompletion :: Ptr StatCompletion -> IO StatCompletion
-peekStatCompletion ptr = do
-  rc <- (#peek hs_stat_completion_t, rc) ptr
-  stat_ptr <- (#peek hs_stat_completion_t, stat) ptr
-  stat <- peekStat stat_ptr <* free stat_ptr
-  return $ StatCompletion rc stat
-
-newtype VoidCompletion = VoidCompletion { voidCompletionRetCode :: CInt }
-  deriving (Show, Eq)
-
-voidCompletionSize :: Int
-voidCompletionSize = (#size hs_void_completion_t)
-
-peekVoidCompletion :: Ptr VoidCompletion -> IO VoidCompletion
-peekVoidCompletion ptr = VoidCompletion <$> (#peek hs_stat_completion_t, rc) ptr
+instance Completion VoidCompletion where
+  csize _ = (#size hs_void_completion_t)
+  peekRet ptr = (#peek hs_stat_completion_t, rc) ptr
+  peekData _ = return $ VoidCompletion ()
 
 -------------------------------------------------------------------------------
 
