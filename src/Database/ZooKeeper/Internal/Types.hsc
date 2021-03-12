@@ -234,6 +234,15 @@ peekStatCompletion ptr = do
   stat <- peekStat stat_ptr <* free stat_ptr
   return $ StatCompletion rc stat
 
+newtype VoidCompletion = VoidCompletion { voidCompletionRetCode :: CInt }
+  deriving (Show, Eq)
+
+voidCompletionSize :: Int
+voidCompletionSize = (#size hs_void_completion_t)
+
+peekVoidCompletion :: Ptr VoidCompletion -> IO VoidCompletion
+peekVoidCompletion ptr = VoidCompletion <$> (#peek hs_stat_completion_t, rc) ptr
+
 -------------------------------------------------------------------------------
 
 -- This structure holds all the arguments necessary for one op as part

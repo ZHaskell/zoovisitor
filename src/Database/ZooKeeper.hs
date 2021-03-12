@@ -5,6 +5,7 @@ module Database.ZooKeeper
   , zooCreate
   , zooGet
   , zooSet
+  , zooDelete
 
   , zookeeperInit
   , zookeeperClose
@@ -115,6 +116,37 @@ zooGet zh path f =
     -- check stat completion return code
     void $ E.throwZooErrorIfNotOK $ I.dataCompletionRetCode result
     f result
+
+-- | Delete a node in zookeeper.
+--
+-- Throw one of the following exceptions on failure:
+--
+-- 'E.ZBADARGUMENTS' - invalid input parameters
+-- 'E.ZINVALIDSTATE' - zhandle state is either ZOO_SESSION_EXPIRED_STATE or ZOO_AUTH_FAILED_STATE
+-- 'E.ZMARSHALLINGERROR' - failed to marshall a request; possibly, out of memory
+zooDelete :: HasCallStack
+          => T.ZHandle
+          -- ^ The zookeeper handle obtained by a call to 'zookeeperResInit'
+          -> CBytes
+          -- ^ The name of the node. Expressed as a file name with slashes
+          -- separating ancestors of the node.
+          -> CInt
+          -- ^ The expected version of the node. The function will fail
+          -- if the actual version of the node does not match the expected version.
+          -- If -1 is used the version check will not take place.
+          -> (T.VoidCompletion -> IO ())
+          -- ^ The routine to invoke when the request completes.
+          -- The completion will be triggered with one of the following codes
+          -- passed in as the rc argument:
+          --
+          -- ZOK          operation completed successfully
+          -- ZNONODE      the node does not exist.
+          -- ZNOAUTH      the client does not have permission.
+          -- ZBADVERSION  expected version does not match actual version.
+          -- ZNOTEMPTY    children are present; node cannot be deleted.
+          -> IO ()
+zooDelete zh path version f = CBytes.withCBytesUnsafe path $ \path' ->
+  f =<< I.withZKAsync I.voidCompletionSize I.peekVoidCompletion (I.c_hs_zoo_adelete zh path' version)
 
 -------------------------------------------------------------------------------
 

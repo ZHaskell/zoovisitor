@@ -3,12 +3,19 @@
 
 module Database.ZooKeeper.Internal.FFI where
 
+import           Control.Concurrent
+import           Control.Exception
+import           Control.Monad                     (void)
 import           Data.Word
-import           Foreign
 import           Foreign.C
-import           GHC.Conc                          (PrimMVar)
+import           Foreign.ForeignPtr
+import           Foreign.Ptr
+import           Foreign.StablePtr
+import           GHC.Conc
+import           GHC.Stack                         (HasCallStack)
 import           Z.Foreign                         (BA##)
 
+import           Database.ZooKeeper.Exception
 import           Database.ZooKeeper.Internal.Types
 
 #include "hs_zk.h"
@@ -53,3 +60,28 @@ foreign import ccall unsafe "hs_zk.h hs_zoo_aget"
     -> BA## Word8
     -> Bool
     -> IO CInt
+
+foreign import ccall unsafe "hs_zk.h hs_zoo_adelete"
+  c_hs_zoo_adelete
+    :: ZHandle
+    -> BA## Word8 -> CInt
+    -> StablePtr PrimMVar -> Int -> Ptr VoidCompletion
+    -> IO CInt
+
+-------------------------------------------------------------------------------
+-- Misc
+
+withZKAsync :: HasCallStack
+            => Int -> (Ptr a -> IO a)
+            -> (StablePtr PrimMVar -> Int -> Ptr a -> IO CInt)
+            -> IO a
+{-# INLINE withZKAsync #-}
+withZKAsync size peekResult f = mask_ $ do
+  mvar <- newEmptyMVar
+  sp <- newStablePtrPrimMVar mvar
+  fp <- mallocForeignPtrBytes size
+  withForeignPtr fp $ \data' -> do
+    (cap, _) <- threadCapability =<< myThreadId
+    void $ throwZooErrorIfNotOK =<< f sp cap data'
+    takeMVar mvar `onException` forkIO (do takeMVar mvar; touchForeignPtr fp)
+    peekResult data'

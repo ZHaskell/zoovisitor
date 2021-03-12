@@ -56,6 +56,7 @@ module Database.ZooKeeper.Exception
     -- * Helpers
   , E.throwIO
   , getCErrNum
+  , pattern ZOK
   ) where
 
 import           Control.Exception (Exception (..))
@@ -101,6 +102,9 @@ instance T.Print ZooExInfo where
 
 instance Show ZooExInfo where
   show = T.toString
+
+pattern ZOK :: CInt
+pattern ZOK = 0
 
 #define MAKE_EX(e)                                \
 newtype e = e ZooExInfo deriving (Show);          \

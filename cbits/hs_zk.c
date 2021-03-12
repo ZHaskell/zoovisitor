@@ -86,6 +86,30 @@ void hs_stat_completion_fn(int rc, const struct Stat* stat, const void* data) {
   hs_thread_done();
 }
 
+/**
+ * \brief signature of a completion function for a call that returns void.
+ *
+ * This method will be invoked at the end of a asynchronous call and also as
+ * a result of connection loss or timeout.
+ * \param rc the error code of the call. Connection loss/timeout triggers
+ * the completion with one of the following error codes:
+ * ZCONNECTIONLOSS -- lost connection to the server
+ * ZOPERATIONTIMEOUT -- connection timed out
+ * Data related events trigger the completion with error codes listed the
+ * Exceptions section of the documentation of the function that initiated the
+ * call. (Zero indicates call was successful.)
+ * \param data the pointer that was passed by the caller when the function
+ *   that this completion corresponds to was invoked. The programmer
+ *   is responsible for any memory freeing associated with the data
+ *   pointer.
+ */
+void hs_void_completion_fn(int rc, const void* data) {
+  hs_void_completion_t* void_completion = (hs_void_completion_t*)data;
+  void_completion->rc = rc;
+  hs_try_putmvar(void_completion->cap, void_completion->mvar);
+  hs_thread_done();
+}
+
 // ----------------------------------------------------------------------------
 
 zhandle_t* hs_zookeeper_init(HsStablePtr mvar, HsInt cap,
@@ -149,6 +173,36 @@ int hs_zoo_aset(HsStablePtr mvar, HsInt cap,
   stat_completion->cap = cap;
   return zoo_aset(zh, path, buffer + offset, buflen, version,
                   hs_stat_completion_fn, stat_completion);
+}
+
+/**
+ * \brief delete a node in zookeeper.
+ *
+ * \param zh the zookeeper handle obtained by a call to \ref zookeeper_init
+ * \param path the name of the node. Expressed as a file name with slashes
+ * separating ancestors of the node.
+ * \param version the expected version of the node. The function will fail if
+ * the actual version of the node does not match the expected version. If -1 is
+ * used the version check will not take place. \param completion the routine to
+ * invoke when the request completes. The completion will be triggered with one
+ * of the following codes passed in as the rc argument: ZOK operation completed
+ * successfully ZNONODE the node does not exist. ZNOAUTH the client does not
+ * have permission. ZBADVERSION expected version does not match actual version.
+ * ZNOTEMPTY children are present; node cannot be deleted.
+ * \param data the data that will be passed to the completion routine when
+ * the function completes.
+ * \return ZOK on success or one of the following errcodes on failure:
+ * ZBADARGUMENTS - invalid input parameters
+ * ZINVALIDSTATE - zhandle state is either ZOO_SESSION_EXPIRED_STATE or
+ * ZOO_AUTH_FAILED_STATE ZMARSHALLINGERROR - failed to marshall a request;
+ * possibly, out of memory
+ */
+int hs_zoo_adelete(zhandle_t* zh, const char* path, int version,
+                   HsStablePtr mvar, HsInt cap,
+                   hs_void_completion_t* void_completion) {
+  void_completion->mvar = mvar;
+  void_completion->cap = cap;
+  return zoo_adelete(zh, path, version, hs_void_completion_fn, void_completion);
 }
 
 // ----------------------------------------------------------------------------
