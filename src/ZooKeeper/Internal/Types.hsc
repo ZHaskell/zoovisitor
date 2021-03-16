@@ -1,6 +1,6 @@
 {-# LANGUAGE CPP #-}
 
-module Database.ZooKeeper.Internal.Types where
+module ZooKeeper.Internal.Types where
 
 import           Data.Int
 import           Data.Proxy    (Proxy (..))

@@ -1,7 +1,7 @@
 {-# LANGUAGE CPP              #-}
 {-# LANGUAGE UnliftedFFITypes #-}
 
-module Database.ZooKeeper.Internal.FFI where
+module ZooKeeper.Internal.FFI where
 
 import           Control.Concurrent
 import           Control.Exception
@@ -15,8 +15,8 @@ import           GHC.Conc
 import           GHC.Stack                         (HasCallStack)
 import           Z.Foreign                         (BA##)
 
-import           Database.ZooKeeper.Exception
-import           Database.ZooKeeper.Internal.Types
+import           ZooKeeper.Exception
+import           ZooKeeper.Internal.Types
 
 #include "hs_zk.h"
 

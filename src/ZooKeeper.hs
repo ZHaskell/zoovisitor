@@ -1,4 +1,4 @@
-module Database.ZooKeeper
+module ZooKeeper
   ( zookeeperResInit
   , Res.withResource
 
@@ -14,31 +14,29 @@ module Database.ZooKeeper
   , zookeeperClose
   ) where
 
-import           Control.Concurrent                (forkIO, myThreadId,
-                                                    newEmptyMVar, takeMVar,
-                                                    threadCapability)
-import           Control.Exception                 (mask_, onException)
-import           Control.Monad                     (void, when, (<=<))
-import           Data.Maybe                        (fromMaybe)
-import           Data.Proxy                        (Proxy (..))
-import           Foreign.C                         (CInt)
-import           Foreign.ForeignPtr                (mallocForeignPtrBytes,
-                                                    touchForeignPtr,
-                                                    withForeignPtr)
-import           Foreign.Ptr                       (nullPtr)
-import           GHC.Conc                          (newStablePtrPrimMVar)
-import           GHC.Stack                         (HasCallStack, callStack)
-import           Z.Data.CBytes                     (CBytes)
-import qualified Z.Data.CBytes                     as CBytes
-import qualified Z.Data.Text.Print                 as Text
-import           Z.Data.Vector                     (Bytes)
-import qualified Z.Foreign                         as Z
-import qualified Z.IO.Resource                     as Res
+import           Control.Concurrent       (forkIO, myThreadId, newEmptyMVar,
+                                           takeMVar, threadCapability)
+import           Control.Exception        (mask_, onException)
+import           Control.Monad            (void, when, (<=<))
+import           Data.Maybe               (fromMaybe)
+import           Data.Proxy               (Proxy (..))
+import           Foreign.C                (CInt)
+import           Foreign.ForeignPtr       (mallocForeignPtrBytes,
+                                           touchForeignPtr, withForeignPtr)
+import           Foreign.Ptr              (nullPtr)
+import           GHC.Conc                 (newStablePtrPrimMVar)
+import           GHC.Stack                (HasCallStack, callStack)
+import           Z.Data.CBytes            (CBytes)
+import qualified Z.Data.CBytes            as CBytes
+import qualified Z.Data.Text.Print        as Text
+import           Z.Data.Vector            (Bytes)
+import qualified Z.Foreign                as Z
+import qualified Z.IO.Resource            as Res
 
-import qualified Database.ZooKeeper.Exception      as E
-import qualified Database.ZooKeeper.Internal.FFI   as I
-import qualified Database.ZooKeeper.Internal.Types as I
-import qualified Database.ZooKeeper.Types          as T
+import qualified ZooKeeper.Exception      as E
+import qualified ZooKeeper.Internal.FFI   as I
+import qualified ZooKeeper.Internal.Types as I
+import qualified ZooKeeper.Types          as T
 
 -------------------------------------------------------------------------------
 

@@ -1,6 +1,6 @@
 {-# LANGUAGE CPP #-}
 
-module Database.ZooKeeper.Exception
+module ZooKeeper.Exception
   ( ZooException
   , zooExceptionToException
   , zooExceptionFromException

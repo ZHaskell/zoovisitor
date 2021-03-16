@@ -30,13 +30,13 @@ source-repository head
 library
   hs-source-dirs:     src
   exposed-modules:
-    Database.ZooKeeper
-    Database.ZooKeeper.Exception
-    Database.ZooKeeper.Types
+    ZooKeeper
+    ZooKeeper.Exception
+    ZooKeeper.Types
 
   other-modules:
-    Database.ZooKeeper.Internal.FFI
-    Database.ZooKeeper.Internal.Types
+    ZooKeeper.Internal.FFI
+    ZooKeeper.Internal.Types
 
   build-depends:
     , base       >=4.12 && <5

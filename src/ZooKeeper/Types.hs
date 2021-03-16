@@ -1,4 +1,4 @@
-module Database.ZooKeeper.Types
+module ZooKeeper.Types
   ( I.ZHandle
 
   , I.ClientID
@@ -22,4 +22,4 @@ module Database.ZooKeeper.Types
 
   ) where
 
-import qualified Database.ZooKeeper.Internal.Types as I
+import qualified ZooKeeper.Internal.Types as I
