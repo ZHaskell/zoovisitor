@@ -5,6 +5,7 @@ module Database.ZooKeeper
   , zooCreate
   , zooSet
   , zooGet
+  , zooWatchGet
   , zooDelete
   , zooExists
   , zooWatchExists
@@ -164,6 +165,42 @@ zooGet zh path = CBytes.withCBytesUnsafe path $ \path' ->
   let csize = I.csize (Proxy :: Proxy T.DataCompletion)
       cfunc = I.c_hs_zoo_aget zh path' 0
     in E.throwZooErrorIfLeft =<< I.withZKAsync csize I.peekRet I.peekData cfunc
+
+-- | Gets the data associated with a node.
+--
+-- Throw one of the following exceptions on failure:
+--
+-- * ZBADARGUMENTS - invalid input parameters
+-- * ZINVALIDSTATE - zhandle state is either in ZOO_SESSION_EXPIRED_STATE or ZOO_AUTH_FAILED_STATE
+-- * ZMARSHALLINGERROR - failed to marshall a request; possibly, out of memory
+zooWatchGet
+  :: HasCallStack
+  => T.ZHandle
+  -> CBytes
+  -> (T.HsWatcherCtx -> IO ())
+  -- ^ The watcher callback.
+  --
+  -- A watch will be set at the server to notify the client if the node changes.
+  -> (T.DataCompletion -> IO ())
+  -- ^ The result callback when the request completes.
+  --
+  -- One of the following exceptions will be thrown if error happens:
+  --
+  -- The completion will be triggered with one of the following codes passed
+  -- in as the rc argument:
+  --
+  -- * ZOK operation completed successfully
+  -- * ZNONODE the node does not exist.
+  -- * ZNOAUTH the client does not have permission.
+  -> IO ()
+zooWatchGet zh path watchfn datafn = CBytes.withCBytesUnsafe path $ \path' ->
+  let csize = I.csize (Proxy :: Proxy T.DataCompletion)
+      watchfn' = watchfn <=< E.throwZooErrorIfLeft
+      datafn' = datafn <=< E.throwZooErrorIfLeft
+   in I.withZKAsync2
+        I.hsWatcherCtxSize (\_ -> return E.CZOK) I.peekHsWatcherCtx watchfn'
+        csize I.peekRet I.peekData datafn'
+        (I.c_hs_zoo_awget zh path')
 
 -- | Delete a node in zookeeper.
 --

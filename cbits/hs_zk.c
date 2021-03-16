@@ -140,30 +140,17 @@ int hs_zoo_aget(zhandle_t* zh, const char* path, int watch, HsStablePtr mvar,
   return zoo_aget(zh, path, watch, hs_data_completion_fn, data_completion);
 }
 
-/** zoo_aset
- * \brief sets the data associated with a node.
- *
- * \param zh the zookeeper handle obtained by a call to \ref zookeeper_init
- * \param path the name of the node. Expressed as a file name with slashes
- * separating ancestors of the node.
- * \param buffer the buffer holding data to be written to the node.
- * \param buflen the number of bytes from buffer to write.
- * \param version the expected version of the node. The function will fail if
- * the actual version of the node does not match the expected version. If -1 is
- * used the version check will not take place. * completion: If null,
- * the function will execute synchronously. Otherwise, the function will return
- * immediately and invoke the completion routine when the request completes.
- * \param completion the routine to invoke when the request completes. The
- * completion will be triggered with one of the following codes passed in as the
- * rc argument: ZOK operation completed successfully ZNONODE the node does not
- * exist. ZNOAUTH the client does not have permission. ZBADVERSION expected
- * version does not match actual version. \param data the data that will be
- * passed to the completion routine when the function completes. \return ZOK on
- * success or one of the following errcodes on failure: ZBADARGUMENTS - invalid
- * input parameters ZINVALIDSTATE - zhandle state is either
- * ZOO_SESSION_EXPIRED_STATE or ZOO_AUTH_FAILED_STATE ZMARSHALLINGERROR - failed
- * to marshall a request; possibly, out of memory
- */
+int hs_zoo_awget(zhandle_t* zh, const char* path, HsStablePtr mvar_w,
+                 HsStablePtr mvar_f, HsInt cap, hs_watcher_ctx_t* watcher_ctx,
+                 hs_data_completion_t* data_completion) {
+  watcher_ctx->mvar = mvar_w;
+  watcher_ctx->cap = cap;
+  data_completion->mvar = mvar_f;
+  data_completion->cap = cap;
+  return zoo_awget(zh, path, hs_zookeeper_watcher_fn, watcher_ctx,
+                   hs_data_completion_fn, data_completion);
+}
+
 int hs_zoo_aset(zhandle_t* zh, const char* path, const char* buffer, int offset,
                 int buflen, int version, HsStablePtr mvar, HsInt cap,
                 hs_stat_completion_t* stat_completion) {
@@ -173,28 +160,6 @@ int hs_zoo_aset(zhandle_t* zh, const char* path, const char* buffer, int offset,
                   hs_stat_completion_fn, stat_completion);
 }
 
-/**
- * \brief delete a node in zookeeper.
- *
- * \param zh the zookeeper handle obtained by a call to \ref zookeeper_init
- * \param path the name of the node. Expressed as a file name with slashes
- * separating ancestors of the node.
- * \param version the expected version of the node. The function will fail if
- * the actual version of the node does not match the expected version. If -1 is
- * used the version check will not take place. \param completion the routine to
- * invoke when the request completes. The completion will be triggered with one
- * of the following codes passed in as the rc argument: ZOK operation completed
- * successfully ZNONODE the node does not exist. ZNOAUTH the client does not
- * have permission. ZBADVERSION expected version does not match actual version.
- * ZNOTEMPTY children are present; node cannot be deleted.
- * \param data the data that will be passed to the completion routine when
- * the function completes.
- * \return ZOK on success or one of the following errcodes on failure:
- * ZBADARGUMENTS - invalid input parameters
- * ZINVALIDSTATE - zhandle state is either ZOO_SESSION_EXPIRED_STATE or
- * ZOO_AUTH_FAILED_STATE ZMARSHALLINGERROR - failed to marshall a request;
- * possibly, out of memory
- */
 int hs_zoo_adelete(zhandle_t* zh, const char* path, int version,
                    HsStablePtr mvar, HsInt cap,
                    hs_void_completion_t* void_completion) {

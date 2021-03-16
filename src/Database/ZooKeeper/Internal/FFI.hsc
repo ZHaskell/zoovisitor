@@ -61,6 +61,13 @@ foreign import ccall unsafe "hs_zk.h hs_zoo_aget"
     -> StablePtr PrimMVar -> Int -> Ptr DataCompletion
     -> IO CInt
 
+foreign import ccall unsafe "hs_zk.h hs_zoo_awget"
+  c_hs_zoo_awget
+    :: ZHandle -> BA## Word8
+    -> StablePtr PrimMVar -> StablePtr PrimMVar -> Int
+    -> Ptr HsWatcherCtx -> Ptr DataCompletion
+    -> IO CInt
+
 foreign import ccall unsafe "hs_zk.h hs_zoo_adelete"
   c_hs_zoo_adelete
     :: ZHandle
