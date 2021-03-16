@@ -6,6 +6,8 @@ module Database.ZooKeeper
   , zooSet
   , zooGet
   , zooDelete
+  , zooExists
+  , zooWatchExists
 
   , zookeeperInit
   , zookeeperClose
@@ -89,21 +91,20 @@ zooCreate :: HasCallStack
           -> T.CreateMode
           -- ^ This parameter can be set to 'T.ZooPersistent' for normal create
           -- or an OR of the Create Flags
-          -> (T.StringCompletion -> IO ())
-          -- ^ The routine to invoke when the request completes. One of the
+          -> IO T.StringCompletion
+          -- ^ The result when the request completes. One of the
           -- following exceptions will be thrown if error happens:
           --
           -- * ZNONODE the parent node does not exist.
           -- * ZNODEEXISTS the node already exists
           -- * ZNOAUTH the client does not have permission.
           -- * ZNOCHILDRENFOREPHEMERALS cannot create children of ephemeral nodes.
-          -> IO ()
-zooCreate zh path value acl (I.CreateMode mode) f =
+zooCreate zh path value acl (I.CreateMode mode) =
   CBytes.withCBytesUnsafe path $ \path' ->
   Z.withPrimVectorUnsafe value $ \val' offset len ->
     let csize = I.csize (Proxy :: Proxy T.StringCompletion)
         cfunc = I.c_hs_zoo_acreate zh path' val' offset len acl mode
-     in f =<< I.withZKAsync csize I.peekRet I.peekData cfunc
+     in E.throwZooErrorIfLeft =<< I.withZKAsync csize I.peekRet I.peekData cfunc
 
 -- | Sets the data associated with a node.
 --
@@ -120,25 +121,25 @@ zooSet :: HasCallStack
        -- separating ancestors of the node.
        -> Bytes
        -- ^ Data to be written to the node.
-       -> CInt
-       -- The expected version of the node. The function will fail if
-       -- the actual version of the node does not match the expected version.
-       -- If -1 is used the version check will not take place.
-       -> (T.StatCompletion -> IO ())
-       -- ^ The routine to invoke when the request completes. One of the
+       -> Maybe CInt
+       -- ^ The expected version of the node. The function will fail
+       -- if the actual version of the node does not match the expected version.
+       -- If Nothing is used the version check will not take place.
+       -> IO T.StatCompletion
+       -- ^ The result when the request completes. One of the
        -- following exceptions will be thrown if error happens:
        --
        -- * ZOK operation completed successfully
        -- * ZNONODE the node does not exist.
        -- * ZNOAUTH the client does not have permission.
        -- * ZBADVERSION expected version does not match actual version.
-       -> IO ()
-zooSet zh path value version f =
+zooSet zh path value m_version =
   CBytes.withCBytesUnsafe path $ \path' ->
   Z.withPrimVectorUnsafe value $ \val' offset len ->
     let csize = I.csize (Proxy :: Proxy T.StatCompletion)
         cfunc = I.c_hs_zoo_aset zh path' val' offset len version
-     in f =<< I.withZKAsync csize I.peekRet I.peekData cfunc
+        version = fromMaybe (-1) m_version
+     in E.throwZooErrorIfLeft =<< I.withZKAsync csize I.peekRet I.peekData cfunc
 
 -- | Gets the data associated with a node.
 --
@@ -153,18 +154,16 @@ zooGet :: HasCallStack
        -> CBytes
        -- ^ The name of the node. Expressed as a file name with slashes
        -- separating ancestors of the node.
-       -> (T.DataCompletion -> IO ())
-       -- ^ The routine to invoke when the request completes. One of the
+       -> IO T.DataCompletion
+       -- ^ The result when the request completes. One of the
        -- following exceptions will be thrown if error happens:
        --
        -- * ZNONODE the node does not exist.
        -- * ZNOAUTH the client does not have permission.
-       -> IO ()
-zooGet zh path f =
-  CBytes.withCBytesUnsafe path $ \path' ->
-    let csize = I.csize (Proxy :: Proxy T.DataCompletion)
-        cfunc = I.c_hs_zoo_aget zh path' False
-     in f =<< I.withZKAsync csize I.peekRet I.peekData cfunc
+zooGet zh path = CBytes.withCBytesUnsafe path $ \path' ->
+  let csize = I.csize (Proxy :: Proxy T.DataCompletion)
+      cfunc = I.c_hs_zoo_aget zh path' 0
+    in E.throwZooErrorIfLeft =<< I.withZKAsync csize I.peekRet I.peekData cfunc
 
 -- | Delete a node in zookeeper.
 --
@@ -173,30 +172,100 @@ zooGet zh path f =
 -- * 'E.ZBADARGUMENTS' - invalid input parameters
 -- * 'E.ZINVALIDSTATE' - zhandle state is either ZOO_SESSION_EXPIRED_STATE or ZOO_AUTH_FAILED_STATE
 -- * 'E.ZMARSHALLINGERROR' - failed to marshall a request; possibly, out of memory
+--
+-- Throw one of the following exceptions will be thrown if the request completes:
+--
+-- * ZNONODE      the node does not exist.
+-- * ZNOAUTH      the client does not have permission.
+-- * ZBADVERSION  expected version does not match actual version.
+-- * ZNOTEMPTY    children are present; node cannot be deleted.
 zooDelete :: HasCallStack
           => T.ZHandle
           -- ^ The zookeeper handle obtained by a call to 'zookeeperResInit'
           -> CBytes
           -- ^ The name of the node. Expressed as a file name with slashes
           -- separating ancestors of the node.
-          -> CInt
+          -> Maybe CInt
           -- ^ The expected version of the node. The function will fail
           -- if the actual version of the node does not match the expected version.
-          -- If -1 is used the version check will not take place.
-          -> (T.VoidCompletion -> IO ())
-          -- ^ The routine to invoke when the request completes. One of the
-          -- following exceptions will be thrown if error happens:
-          --
-          -- * ZNONODE      the node does not exist.
-          -- * ZNOAUTH      the client does not have permission.
-          -- * ZBADVERSION  expected version does not match actual version.
-          -- * ZNOTEMPTY    children are present; node cannot be deleted.
+          -- If Nothing is used the version check will not take place.
           -> IO ()
-zooDelete zh path version f =
+zooDelete zh path m_version = CBytes.withCBytesUnsafe path $ \path' ->
+  let csize = I.csize (Proxy :: Proxy T.VoidCompletion)
+      cfunc = I.c_hs_zoo_adelete zh path' version
+      version = fromMaybe (-1) m_version
+   in void $ E.throwZooErrorIfLeft =<< I.withZKAsync csize I.peekRet I.peekData cfunc
+
+-- | Checks the existence of a node in zookeeper.
+--
+-- Throw one of the following exceptions on failure:
+--
+-- * ZBADARGUMENTS - invalid input parameters
+-- * ZINVALIDSTATE - zhandle state is either ZOO_SESSION_EXPIRED_STATE or ZOO_AUTH_FAILED_STATE
+-- * ZMARSHALLINGERROR - failed to marshall a request; possibly, out of memory
+zooExists :: HasCallStack
+          => T.ZHandle
+          -- ^ The zookeeper handle obtained by a call to 'zookeeperResInit'
+          -> CBytes
+          -- ^ The name of the node. Expressed as a file name with slashes
+          -- separating ancestors of the node.
+          -> IO (Maybe T.StatCompletion)
+          -- ^ The result when the request completes. Nothing means
+          -- the node does not exist.
+          --
+          -- One of the following exceptions will be thrown if error happens:
+          --
+          -- * ZNOAUTH the client does not have permission.
+zooExists zh path =
   CBytes.withCBytesUnsafe path $ \path' ->
-    let csize = I.csize (Proxy :: Proxy T.VoidCompletion)
-        cfunc = I.c_hs_zoo_adelete zh path' version
-     in f =<< I.withZKAsync csize I.peekRet I.peekData cfunc
+    let csize = I.csize (Proxy :: Proxy T.StatCompletion)
+        cfunc = I.c_hs_zoo_aexists zh path' 0
+     in E.throwZooErrorIfLeft' (== E.CZNONODE) =<< I.withZKAsync csize I.peekRet I.peekData cfunc
+
+-- | Checks the existence of a node in zookeeper.
+--
+-- This function is similar to 'zooExists' except it allows one specify
+-- a watcher object. The function will be called once the watch has fired.
+--
+-- Note that there is only one thread for triggering callbacks. Which means
+-- this function will first block on the stat completion, and then wating on
+-- the watcher.
+--
+-- Throw one of the following exceptions on failure:
+--
+-- * ZBADARGUMENTS - invalid input parameters
+-- * ZINVALIDSTATE - zhandle state is either ZOO_SESSION_EXPIRED_STATE or ZOO_AUTH_FAILED_STATE
+-- * ZMARSHALLINGERROR - failed to marshall a request; possibly, out of memory
+zooWatchExists
+  :: HasCallStack
+  => T.ZHandle
+  -- ^ The zookeeper handle obtained by a call to 'zookeeperResInit'
+  -> CBytes
+  -- ^ The name of the node. Expressed as a file name with slashes
+  -- separating ancestors of the node.
+  -> (T.HsWatcherCtx -> IO ())
+  -- ^ The watcher callback.
+  --
+  -- A watch will set on the specified znode on the server. The watch will be
+  -- set even if the node does not exist. This allows clients to watch for
+  -- nodes to appear.
+  -> (Maybe T.StatCompletion -> IO ())
+  -- ^ The result callback when the request completes. Nothing means
+  -- the node does not exist.
+  --
+  -- One of the following exceptions will be thrown if error happens:
+  --
+  -- * ZNOAUTH the client does not have permission.
+  -> IO ()
+zooWatchExists zh path watchfn statfn =
+  let csize = I.csize (Proxy :: Proxy T.StatCompletion)
+      watchfn' = watchfn <=< E.throwZooErrorIfLeft
+      statfn' = statfn <=< E.throwZooErrorIfLeft' (== E.CZNONODE)
+   in CBytes.withCBytesUnsafe path $ \path' ->
+        I.withZKAsync2
+          I.hsWatcherCtxSize (\_ -> return E.CZOK) I.peekHsWatcherCtx watchfn'
+          csize I.peekRet I.peekData statfn'
+          (I.c_hs_zoo_awexists zh path')
 
 -------------------------------------------------------------------------------
 

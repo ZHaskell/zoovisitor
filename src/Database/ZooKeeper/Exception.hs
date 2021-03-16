@@ -52,11 +52,47 @@ module Database.ZooKeeper.Exception
 
   , throwZooError
   , throwZooErrorIfNotOK
+  , throwZooErrorIfLeft
+  , throwZooErrorIfLeft'
+
+    -- * Error number patterns
+  , pattern CZOK
+  , pattern CZSYSTEMERROR
+  , pattern CZRUNTIMEINCONSISTENCY
+  , pattern CZDATAINCONSISTENCY
+  , pattern CZCONNECTIONLOSS
+  , pattern CZMARSHALLINGERROR
+  , pattern CZUNIMPLEMENTED
+  , pattern CZOPERATIONTIMEOUT
+  , pattern CZBADARGUMENTS
+  , pattern CZINVALIDSTATE
+  , pattern CZNEWCONFIGNOQUORUM
+  , pattern CZRECONFIGINPROGRESS
+  , pattern CZSSLCONNECTIONERROR
+  , pattern CZAPIERROR
+  , pattern CZNONODE
+  , pattern CZNOAUTH
+  , pattern CZBADVERSION
+  , pattern CZNOCHILDRENFOREPHEMERALS
+  , pattern CZNODEEXISTS
+  , pattern CZNOTEMPTY
+  , pattern CZSESSIONEXPIRED
+  , pattern CZINVALIDCALLBACK
+  , pattern CZINVALIDACL
+  , pattern CZAUTHFAILED
+  , pattern CZCLOSING
+  , pattern CZNOTHING
+  , pattern CZSESSIONMOVED
+  , pattern CZNOTREADONLY
+  , pattern CZEPHEMERALONLOCALSESSION
+  , pattern CZNOWATCHER
+  , pattern CZRECONFIGDISABLED
+  , pattern CZSESSIONCLOSEDREQUIRESASLAUTH
+  , pattern CZTHROTTLEDOP
 
     -- * Helpers
   , E.throwIO
   , getCErrNum
-  , pattern ZOK
   ) where
 
 import           Control.Exception (Exception (..))
@@ -103,15 +139,80 @@ instance T.Print ZooExInfo where
 instance Show ZooExInfo where
   show = T.toString
 
-pattern ZOK :: CInt
-pattern ZOK = 0
+pattern
+    CZOK
+  , CZSYSTEMERROR
+  , CZRUNTIMEINCONSISTENCY
+  , CZDATAINCONSISTENCY
+  , CZCONNECTIONLOSS
+  , CZMARSHALLINGERROR
+  , CZUNIMPLEMENTED
+  , CZOPERATIONTIMEOUT
+  , CZBADARGUMENTS
+  , CZINVALIDSTATE
+  , CZNEWCONFIGNOQUORUM
+  , CZRECONFIGINPROGRESS
+  , CZSSLCONNECTIONERROR
+  , CZAPIERROR
+  , CZNONODE
+  , CZNOAUTH
+  , CZBADVERSION
+  , CZNOCHILDRENFOREPHEMERALS
+  , CZNODEEXISTS
+  , CZNOTEMPTY
+  , CZSESSIONEXPIRED
+  , CZINVALIDCALLBACK
+  , CZINVALIDACL
+  , CZAUTHFAILED
+  , CZCLOSING
+  , CZNOTHING
+  , CZSESSIONMOVED
+  , CZNOTREADONLY
+  , CZEPHEMERALONLOCALSESSION
+  , CZNOWATCHER
+  , CZRECONFIGDISABLED
+  , CZSESSIONCLOSEDREQUIRESASLAUTH
+  , CZTHROTTLEDOP
+  :: CInt
+pattern CZOK = 0
+pattern CZSYSTEMERROR          = (- 1)
+pattern CZRUNTIMEINCONSISTENCY = (- 2)
+pattern CZDATAINCONSISTENCY    = (- 3)
+pattern CZCONNECTIONLOSS       = (- 4)
+pattern CZMARSHALLINGERROR     = (- 5)
+pattern CZUNIMPLEMENTED        = (- 6)
+pattern CZOPERATIONTIMEOUT     = (- 7)
+pattern CZBADARGUMENTS         = (- 8)
+pattern CZINVALIDSTATE         = (- 9)
+pattern CZNEWCONFIGNOQUORUM    = (-13)
+pattern CZRECONFIGINPROGRESS   = (-14)
+pattern CZSSLCONNECTIONERROR   = (-15)
+pattern CZAPIERROR                     = (-100)
+pattern CZNONODE                       = (-101)
+pattern CZNOAUTH                       = (-102)
+pattern CZBADVERSION                   = (-103)
+pattern CZNOCHILDRENFOREPHEMERALS      = (-108)
+pattern CZNODEEXISTS                   = (-110)
+pattern CZNOTEMPTY                     = (-111)
+pattern CZSESSIONEXPIRED               = (-112)
+pattern CZINVALIDCALLBACK              = (-113)
+pattern CZINVALIDACL                   = (-114)
+pattern CZAUTHFAILED                   = (-115)
+pattern CZCLOSING                      = (-116)
+pattern CZNOTHING                      = (-117)
+pattern CZSESSIONMOVED                 = (-118)
+pattern CZNOTREADONLY                  = (-119)
+pattern CZEPHEMERALONLOCALSESSION      = (-120)
+pattern CZNOWATCHER                    = (-121)
+pattern CZRECONFIGDISABLED             = (-123)
+pattern CZSESSIONCLOSEDREQUIRESASLAUTH = (-124)
+pattern CZTHROTTLEDOP                  = (-127)
 
 #define MAKE_EX(e)                                \
 newtype e = e ZooExInfo deriving (Show);          \
 instance Exception e where                        \
 { toException = zooExceptionToException;          \
-  fromException = zooExceptionFromException       \
-}
+  fromException = zooExceptionFromException }     \
 
 -- $serverSideErrors
 --
@@ -167,38 +268,38 @@ throwZooError c stack = do                                      \
   E.throwIO $ e (ZooExInfo desc stack)
 
 throwZooError :: CInt -> CallStack -> IO a
-MAKE_THROW_EX((- 1), ZSYSTEMERROR         )
-MAKE_THROW_EX((- 2), ZRUNTIMEINCONSISTENCY)
-MAKE_THROW_EX((- 3), ZDATAINCONSISTENCY   )
-MAKE_THROW_EX((- 4), ZCONNECTIONLOSS      )
-MAKE_THROW_EX((- 5), ZMARSHALLINGERROR    )
-MAKE_THROW_EX((- 6), ZUNIMPLEMENTED       )
-MAKE_THROW_EX((- 7), ZOPERATIONTIMEOUT    )
-MAKE_THROW_EX((- 8), ZBADARGUMENTS        )
-MAKE_THROW_EX((- 9), ZINVALIDSTATE        )
-MAKE_THROW_EX((-13), ZNEWCONFIGNOQUORUM   )
-MAKE_THROW_EX((-14), ZRECONFIGINPROGRESS  )
-MAKE_THROW_EX((-15), ZSSLCONNECTIONERROR  )
-MAKE_THROW_EX((-100), ZAPIERROR                    )
-MAKE_THROW_EX((-101), ZNONODE                      )
-MAKE_THROW_EX((-102), ZNOAUTH                      )
-MAKE_THROW_EX((-103), ZBADVERSION                  )
-MAKE_THROW_EX((-108), ZNOCHILDRENFOREPHEMERALS     )
-MAKE_THROW_EX((-110), ZNODEEXISTS                  )
-MAKE_THROW_EX((-111), ZNOTEMPTY                    )
-MAKE_THROW_EX((-112), ZSESSIONEXPIRED              )
-MAKE_THROW_EX((-113), ZINVALIDCALLBACK             )
-MAKE_THROW_EX((-114), ZINVALIDACL                  )
-MAKE_THROW_EX((-115), ZAUTHFAILED                  )
-MAKE_THROW_EX((-116), ZCLOSING                     )
-MAKE_THROW_EX((-117), ZNOTHING                     )
-MAKE_THROW_EX((-118), ZSESSIONMOVED                )
-MAKE_THROW_EX((-119), ZNOTREADONLY                 )
-MAKE_THROW_EX((-120), ZEPHEMERALONLOCALSESSION     )
-MAKE_THROW_EX((-121), ZNOWATCHER                   )
-MAKE_THROW_EX((-123), ZRECONFIGDISABLED            )
-MAKE_THROW_EX((-124), ZSESSIONCLOSEDREQUIRESASLAUTH)
-MAKE_THROW_EX((-127), ZTHROTTLEDOP                 )
+MAKE_THROW_EX(CZSYSTEMERROR         , ZSYSTEMERROR         )
+MAKE_THROW_EX(CZRUNTIMEINCONSISTENCY, ZRUNTIMEINCONSISTENCY)
+MAKE_THROW_EX(CZDATAINCONSISTENCY   , ZDATAINCONSISTENCY   )
+MAKE_THROW_EX(CZCONNECTIONLOSS      , ZCONNECTIONLOSS      )
+MAKE_THROW_EX(CZMARSHALLINGERROR    , ZMARSHALLINGERROR    )
+MAKE_THROW_EX(CZUNIMPLEMENTED       , ZUNIMPLEMENTED       )
+MAKE_THROW_EX(CZOPERATIONTIMEOUT    , ZOPERATIONTIMEOUT    )
+MAKE_THROW_EX(CZBADARGUMENTS        , ZBADARGUMENTS        )
+MAKE_THROW_EX(CZINVALIDSTATE        , ZINVALIDSTATE        )
+MAKE_THROW_EX(CZNEWCONFIGNOQUORUM   , ZNEWCONFIGNOQUORUM   )
+MAKE_THROW_EX(CZRECONFIGINPROGRESS  , ZRECONFIGINPROGRESS  )
+MAKE_THROW_EX(CZSSLCONNECTIONERROR  , ZSSLCONNECTIONERROR  )
+MAKE_THROW_EX(CZAPIERROR                    , ZAPIERROR                    )
+MAKE_THROW_EX(CZNONODE                      , ZNONODE                      )
+MAKE_THROW_EX(CZNOAUTH                      , ZNOAUTH                      )
+MAKE_THROW_EX(CZBADVERSION                  , ZBADVERSION                  )
+MAKE_THROW_EX(CZNOCHILDRENFOREPHEMERALS     , ZNOCHILDRENFOREPHEMERALS     )
+MAKE_THROW_EX(CZNODEEXISTS                  , ZNODEEXISTS                  )
+MAKE_THROW_EX(CZNOTEMPTY                    , ZNOTEMPTY                    )
+MAKE_THROW_EX(CZSESSIONEXPIRED              , ZSESSIONEXPIRED              )
+MAKE_THROW_EX(CZINVALIDCALLBACK             , ZINVALIDCALLBACK             )
+MAKE_THROW_EX(CZINVALIDACL                  , ZINVALIDACL                  )
+MAKE_THROW_EX(CZAUTHFAILED                  , ZAUTHFAILED                  )
+MAKE_THROW_EX(CZCLOSING                     , ZCLOSING                     )
+MAKE_THROW_EX(CZNOTHING                     , ZNOTHING                     )
+MAKE_THROW_EX(CZSESSIONMOVED                , ZSESSIONMOVED                )
+MAKE_THROW_EX(CZNOTREADONLY                 , ZNOTREADONLY                 )
+MAKE_THROW_EX(CZEPHEMERALONLOCALSESSION     , ZEPHEMERALONLOCALSESSION     )
+MAKE_THROW_EX(CZNOWATCHER                   , ZNOWATCHER                   )
+MAKE_THROW_EX(CZRECONFIGDISABLED            , ZRECONFIGDISABLED            )
+MAKE_THROW_EX(CZSESSIONCLOSEDREQUIRESASLAUTH, ZSESSIONCLOSEDREQUIRESASLAUTH)
+MAKE_THROW_EX(CZTHROTTLEDOP                 , ZTHROTTLEDOP                 )
 throwZooError code stack
   | code > 0 = do
       desc <- T.validate <$> (Z.fromNullTerminated =<< c_zerror code)
@@ -211,6 +312,14 @@ throwZooErrorIfNotOK :: HasCallStack => CInt -> IO CInt
 throwZooErrorIfNotOK code
   | code == 0 = return 0
   | otherwise = throwZooError code callStack
+
+throwZooErrorIfLeft :: HasCallStack => Either CInt a -> IO a
+throwZooErrorIfLeft (Left rc) = throwZooError rc callStack
+throwZooErrorIfLeft (Right x) = return x
+
+throwZooErrorIfLeft' :: HasCallStack => (CInt -> Bool) -> Either CInt a -> IO (Maybe a)
+throwZooErrorIfLeft' cond (Left rc) = if cond rc then return Nothing else throwZooError rc callStack
+throwZooErrorIfLeft' _ (Right x)    = return $ Just x
 
 -------------------------------------------------------------------------------
 

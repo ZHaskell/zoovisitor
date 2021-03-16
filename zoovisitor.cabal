@@ -20,6 +20,7 @@ build-type:         Simple
 extra-source-files:
   ChangeLog.md
   include/hs_zk.h
+  LICENSE_ZOOKEEPER
   README.md
 
 source-repository head

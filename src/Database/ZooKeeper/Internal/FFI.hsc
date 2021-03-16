@@ -57,7 +57,7 @@ foreign import ccall unsafe "hs_zk.h hs_zoo_aget"
   c_hs_zoo_aget
     :: ZHandle
     -> BA## Word8
-    -> Bool
+    -> CInt
     -> StablePtr PrimMVar -> Int -> Ptr DataCompletion
     -> IO CInt
 
@@ -68,13 +68,26 @@ foreign import ccall unsafe "hs_zk.h hs_zoo_adelete"
     -> StablePtr PrimMVar -> Int -> Ptr VoidCompletion
     -> IO CInt
 
+foreign import ccall unsafe "hs_zk.h hs_zoo_aexists"
+  c_hs_zoo_aexists
+    :: ZHandle -> BA## Word8 -> CInt
+    -> StablePtr PrimMVar -> Int -> Ptr StatCompletion
+    -> IO CInt
+
+foreign import ccall unsafe "hs_zk.h hs_zoo_awexists"
+  c_hs_zoo_awexists
+    :: ZHandle -> BA## Word8
+    -> StablePtr PrimMVar -> StablePtr PrimMVar -> Int
+    -> Ptr HsWatcherCtx -> Ptr StatCompletion
+    -> IO CInt
+
 -------------------------------------------------------------------------------
 -- Misc
 
 withZKAsync :: HasCallStack
             => Int -> (Ptr a -> IO CInt) -> (Ptr a -> IO a)
             -> (StablePtr PrimMVar -> Int -> Ptr a -> IO CInt)
-            -> IO a
+            -> IO (Either CInt a)
 {-# INLINE withZKAsync #-}
 withZKAsync size peek_result peek_data f = mask_ $ do
   mvar <- newEmptyMVar
@@ -85,4 +98,41 @@ withZKAsync size peek_result peek_data f = mask_ $ do
     void $ throwZooErrorIfNotOK =<< f sp cap data'
     takeMVar mvar `onException` forkIO (do takeMVar mvar; touchForeignPtr fp)
     rc <- peek_result data'
-    throwZooErrorIfNotOK rc >> peek_data data'
+    case rc of
+      CZOK -> Right <$> peek_data data'
+      _    -> return $ Left rc
+
+withZKAsync2
+  :: HasCallStack
+  => Int -> (Ptr a -> IO CInt) -> (Ptr a -> IO a)
+  -> (Either CInt a -> IO ())
+  -> Int -> (Ptr b -> IO CInt) -> (Ptr b -> IO b)
+  -> (Either CInt b -> IO ())
+  -> (StablePtr PrimMVar -> StablePtr PrimMVar -> Int -> Ptr a -> Ptr b -> IO CInt)
+  -> IO ()
+{-# INLINE withZKAsync2 #-}
+withZKAsync2 size1 peekRet1 peekData1 f1 size2 peekRet2 peekData2 f2 g = mask_ $ do
+  mvar1 <- newEmptyMVar
+  sp1 <- newStablePtrPrimMVar mvar1
+  fp1 <- mallocForeignPtrBytes size1
+
+  mvar2 <- newEmptyMVar
+  sp2 <- newStablePtrPrimMVar mvar2
+  fp2 <- mallocForeignPtrBytes size2
+
+  withForeignPtr fp1 $ \data1' ->
+    withForeignPtr fp2 $ \data2' -> do
+      (cap, _) <- threadCapability =<< myThreadId
+      void $ throwZooErrorIfNotOK =<< g sp1 sp2 cap data1' data2'
+
+      takeMVar mvar2 `onException` forkIO (do takeMVar mvar2; touchForeignPtr fp2)
+      rc2 <- peekRet2 data2'
+      case rc2 of
+        CZOK -> f2 =<< Right <$> peekData2 data2'
+        _    -> f2 $ Left rc2
+
+      takeMVar mvar1 `onException` forkIO (do takeMVar mvar1; touchForeignPtr fp1)
+      rc1 <- peekRet1 data1'
+      case rc1 of
+        CZOK -> f1 =<< Right <$> peekData1 data1'
+        _    -> f1 $ Left rc1

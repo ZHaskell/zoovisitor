@@ -76,5 +76,13 @@ int hs_zoo_adelete(zhandle_t* zh, const char* path, int version,
                    HsStablePtr mvar, HsInt cap,
                    hs_void_completion_t* void_completion);
 
+int hs_zoo_aexists(zhandle_t* zh, const char* path, int watch, HsStablePtr mvar,
+                   HsInt cap, hs_stat_completion_t* stat_completion);
+
+int hs_zoo_awexists(zhandle_t* zh, const char* path, HsStablePtr mvar_w,
+                    HsStablePtr mvar_f, HsInt cap,
+                    hs_watcher_ctx_t* watcher_ctx,
+                    hs_stat_completion_t* stat_completion);
+
 // End define HS_ZK
 #endif

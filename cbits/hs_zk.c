@@ -203,4 +203,23 @@ int hs_zoo_adelete(zhandle_t* zh, const char* path, int version,
   return zoo_adelete(zh, path, version, hs_void_completion_fn, void_completion);
 }
 
+int hs_zoo_aexists(zhandle_t* zh, const char* path, int watch, HsStablePtr mvar,
+                   HsInt cap, hs_stat_completion_t* stat_completion) {
+  stat_completion->mvar = mvar;
+  stat_completion->cap = cap;
+  return zoo_aexists(zh, path, watch, hs_stat_completion_fn, stat_completion);
+}
+
+int hs_zoo_awexists(zhandle_t* zh, const char* path, HsStablePtr mvar_w,
+                    HsStablePtr mvar_f, HsInt cap,
+                    hs_watcher_ctx_t* watcher_ctx,
+                    hs_stat_completion_t* stat_completion) {
+  watcher_ctx->mvar = mvar_w;
+  watcher_ctx->cap = cap;
+  stat_completion->mvar = mvar_f;
+  stat_completion->cap = cap;
+  return zoo_awexists(zh, path, hs_zookeeper_watcher_fn, watcher_ctx,
+                      hs_stat_completion_fn, stat_completion);
+}
+
 // ----------------------------------------------------------------------------
