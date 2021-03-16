@@ -41,8 +41,8 @@ library
   build-depends:
     , base       >=4.12 && <5
     , primitive  >=0.6  && <0.8
-    , Z-Data     ^>=0.6
-    , Z-IO       ^>=0.6
+    , Z-Data     ^>=0.7
+    , Z-IO       ^>=0.7
 
   includes:           hs_zk.h
   c-sources:          cbits/hs_zk.c
@@ -66,7 +66,6 @@ library
     RankNTypes
     ScopedTypeVariables
     StandaloneDeriving
-    StandaloneKindSignatures
     TypeApplications
     TypeOperators
 
