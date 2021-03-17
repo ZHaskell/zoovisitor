@@ -12,10 +12,14 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        ghc: ['8.8', '8.10']
+        ghc: ['8.8', '8.10', '9.0']
         cabal: ['3.2', '3.4']
         os: [ubuntu-latest]
-    name: Haskell ghc-${{ matrix.ghc }} cabal-${{matrix.cabal}} on ${{ matrix.os }}
+        exclude:
+          - ghc: 9.0
+            cabal: 3.2
+
+    name: ghc-${{ matrix.ghc }} cabal-${{matrix.cabal}} on ${{ matrix.os }}
 
     steps:
       - uses: actions/checkout@v2
