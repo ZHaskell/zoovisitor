@@ -5,15 +5,17 @@ module ZooKeeper.Internal.FFI where
 
 import           Control.Concurrent
 import           Control.Exception
-import           Control.Monad                     (void)
+import           Control.Monad            (void)
 import           Data.Word
 import           Foreign.C
 import           Foreign.ForeignPtr
 import           Foreign.Ptr
 import           Foreign.StablePtr
 import           GHC.Conc
-import           GHC.Stack                         (HasCallStack)
-import           Z.Foreign                         (BA##)
+import           GHC.Stack                (HasCallStack)
+import qualified Z.Data.Builder           as B
+import           Z.Data.Text              (Text)
+import           Z.Foreign                (BA##)
 
 import           ZooKeeper.Exception
 import           ZooKeeper.Internal.Types
@@ -21,6 +23,22 @@ import           ZooKeeper.Internal.Types
 #include "hs_zk.h"
 
 -------------------------------------------------------------------------------
+
+zooVersion :: Text
+#ifdef ZOO_MAJOR_VERSION
+zooVersion = B.buildText $ B.int @Int (#const ZOO_MAJOR_VERSION) <> "."
+                        <> B.int @Int (#const ZOO_MINOR_VERSION) <> "."
+                        <> B.int @Int (#const ZOO_PATCH_VERSION)
+#else
+zooVersion = "unsupported"
+#endif
+
+foreign import ccall unsafe "hs_zk.h &logLevel"
+  c_log_level :: Ptr ZooLogLevel
+
+-- | Sets the debugging level for the zookeeper library
+foreign import ccall unsafe "hs_zk.h zoo_set_debug_level"
+  zooSetDebugLevel :: ZooLogLevel -> IO ()
 
 foreign import ccall unsafe "hs_zk.h hs_zookeeper_init"
   c_hs_zookeeper_init

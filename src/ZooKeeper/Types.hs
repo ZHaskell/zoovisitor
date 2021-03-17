@@ -20,6 +20,11 @@ module ZooKeeper.Types
   , pattern I.ZooEphemeral
   , pattern I.ZooSequence
 
+  , I.ZooLogLevel
+  , pattern I.ZooLogError
+  , pattern I.ZooLogWarn
+  , pattern I.ZooLogInfo
+  , pattern I.ZooLogDebug
   ) where
 
 import qualified ZooKeeper.Internal.Types as I

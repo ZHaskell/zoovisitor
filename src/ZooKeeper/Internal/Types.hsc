@@ -17,7 +17,14 @@ import qualified Z.Foreign     as Z
 -------------------------------------------------------------------------------
 
 newtype ZooLogLevel = ZooLogLevel CInt
-  deriving (Show, Eq)
+  deriving (Eq, Storable)
+
+instance Show ZooLogLevel where
+  show ZooLogError = "ERROR"
+  show ZooLogWarn  = "WARN"
+  show ZooLogInfo  = "INFO"
+  show ZooLogDebug = "DEBUG"
+  show (ZooLogLevel x) = "ZooLogLevel " ++ show x
 
 pattern ZooLogError, ZooLogWarn, ZooLogInfo, ZooLogDebug :: ZooLogLevel
 pattern ZooLogError = ZooLogLevel (#const ZOO_LOG_LEVEL_ERROR)

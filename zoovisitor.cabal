@@ -12,7 +12,7 @@ license-file:       LICENSE
 copyright:          Copyright (c)
 author:             mu
 maintainer:         mu@laxcat.xyz
-tested-with:        GHC ==8.6.5 || ==8.8.4 || ==8.10.3
+tested-with:        GHC ==8.8.4 || ==8.10.3 || ==9.0.1
 category:           Database
 homepage:           https://github.com/ZHaskell/zoovisitor
 bug-reports:        https://github.com/ZHaskell/zoovisitor/issues

@@ -1,5 +1,8 @@
 module ZooKeeper
-  ( zookeeperResInit
+  ( I.zooVersion
+  , I.zooSetDebugLevel
+
+  , zookeeperResInit
   , Res.withResource
 
   , zooCreate
