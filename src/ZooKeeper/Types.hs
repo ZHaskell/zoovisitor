@@ -11,6 +11,7 @@ module ZooKeeper.Types
   , I.HsWatcherCtx
 
   , I.StringCompletion (..)
+  , I.StringsCompletion (..)
   , I.DataCompletion (..)
   , I.StatCompletion (..)
   , I.VoidCompletion

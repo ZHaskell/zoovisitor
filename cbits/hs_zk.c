@@ -10,7 +10,7 @@ void hs_zookeeper_watcher_fn(zhandle_t* zh, int type, int state,
   watcher_ctx->zh = zh;
   watcher_ctx->type = type;
   watcher_ctx->state = state;
-  watcher_ctx->path = path;
+  watcher_ctx->path = strdup(path);
   hs_try_putmvar(watcher_ctx->cap, watcher_ctx->mvar);
   hs_thread_done();
 }
@@ -79,7 +79,7 @@ void hs_data_completion_fn(int rc, const char* value, int value_len,
 void hs_stat_completion_fn(int rc, const struct Stat* stat, const void* data) {
   hs_stat_completion_t* stat_completion = (hs_stat_completion_t*)data;
   stat_completion->rc = rc;
-  if (rc == 0) {
+  if (!rc) {
     stat_completion->stat = dup_stat(stat);
   }
   hs_try_putmvar(stat_completion->cap, stat_completion->mvar);
@@ -107,6 +107,38 @@ void hs_void_completion_fn(int rc, const void* data) {
   hs_void_completion_t* void_completion = (hs_void_completion_t*)data;
   void_completion->rc = rc;
   hs_try_putmvar(void_completion->cap, void_completion->mvar);
+  hs_thread_done();
+}
+
+/**
+ * \brief signature of a completion function that returns a list of strings.
+ *
+ * This method will be invoked at the end of a asynchronous call and also as
+ * a result of connection loss or timeout.
+ * \param rc the error code of the call. Connection loss/timeout triggers
+ * the completion with one of the following error codes:
+ * ZCONNECTIONLOSS -- lost connection to the server
+ * ZOPERATIONTIMEOUT -- connection timed out
+ * Data related events trigger the completion with error codes listed the
+ * Exceptions section of the documentation of the function that initiated the
+ * call. (Zero indicates call was successful.)
+ * \param strings a pointer to the structure containng the list of strings of
+ * the names of the children of a node. If a non zero error code is returned,
+ *   the content of strings is undefined. The programmer is NOT responsible
+ *   for freeing strings.
+ * \param data the pointer that was passed by the caller when the function
+ *   that this completion corresponds to was invoked. The programmer
+ *   is responsible for any memory freeing associated with the data
+ *   pointer.
+ */
+void hs_strings_completion_fn(int rc, const string_vector_t* strings,
+                              const void* data) {
+  hs_strings_completion_t* strings_completion = (hs_strings_completion_t*)data;
+  strings_completion->rc = rc;
+  if (!rc) {
+    strings_completion->strings = dup_string_vector(strings);
+  }
+  hs_try_putmvar(strings_completion->cap, strings_completion->mvar);
   hs_thread_done();
 }
 
@@ -185,6 +217,27 @@ int hs_zoo_awexists(zhandle_t* zh, const char* path, HsStablePtr mvar_w,
   stat_completion->cap = cap;
   return zoo_awexists(zh, path, hs_zookeeper_watcher_fn, watcher_ctx,
                       hs_stat_completion_fn, stat_completion);
+}
+
+int hs_zoo_aget_children(zhandle_t* zh, const char* path, int watch,
+                         HsStablePtr mvar, HsInt cap,
+                         hs_strings_completion_t* strings_completion) {
+  strings_completion->mvar = mvar;
+  strings_completion->cap = cap;
+  return zoo_aget_children(zh, path, watch, hs_strings_completion_fn,
+                           strings_completion);
+}
+
+int hs_zoo_awget_children(zhandle_t* zh, const char* path, HsStablePtr mvar_w,
+                          HsStablePtr mvar_f, HsInt cap,
+                          hs_watcher_ctx_t* watcher_ctx,
+                          hs_strings_completion_t* strings_completion) {
+  watcher_ctx->mvar = mvar_w;
+  watcher_ctx->cap = cap;
+  strings_completion->mvar = mvar_f;
+  strings_completion->cap = cap;
+  return zoo_awget_children(zh, path, hs_zookeeper_watcher_fn, watcher_ctx,
+                            hs_strings_completion_fn, strings_completion);
 }
 
 // ----------------------------------------------------------------------------
