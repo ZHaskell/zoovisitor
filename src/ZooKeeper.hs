@@ -12,6 +12,8 @@ module ZooKeeper
   , zooWatchGet
   , zooGetChildren
   , zooWatchGetChildren
+  , zooGetChildren2
+  , zooWatchGetChildren2
   , zooDelete
   , zooExists
   , zooWatchExists
@@ -342,6 +344,8 @@ zooGetChildren zh path = CBytes.withCBytesUnsafe path $ \path' -> do
 -- Note that there is only one thread for triggering callbacks. Which means this
 -- function will first block on the completion, and then wating on the watcher.
 --
+-- Throw one of the following exceptions on failure:
+--
 -- ZBADARGUMENTS - invalid input parameters
 -- ZINVALIDSTATE - zhandle state is either ZOO_SESSION_EXPIRED_STATE or ZOO_AUTH_FAILED_STATE
 -- ZMARSHALLINGERROR - failed to marshall a request; possibly, out of memory
@@ -372,6 +376,74 @@ zooWatchGetChildren zh path watchfn stringsfn =
           I.hsWatcherCtxSize (\_ -> return E.CZOK) I.peekHsWatcherCtx watchfn'
           csize I.peekRet I.peekData stringsfn'
           (I.c_hs_zoo_awget_children zh path')
+
+-- | Lists the children of a node, and get the parent stat.
+--
+-- This function is new in version 3.3.0
+--
+-- Throw one of the following exceptions on failure:
+--
+-- * 'E.ZBADARGUMENTS' - invalid input parameters
+-- * 'E.ZINVALIDSTATE' - zhandle state is either ZOO_SESSION_EXPIRED_STATE or ZOO_AUTH_FAILED_STATE
+-- * 'E.ZMARSHALLINGERROR' - failed to marshall a request; possibly, out of memory
+zooGetChildren2
+  :: HasCallStack
+  => T.ZHandle
+  -- ^ The zookeeper handle obtained by a call to 'zookeeperResInit'
+  -> CBytes
+  -- ^ The name of the node. Expressed as a file name with slashes
+  -- separating ancestors of the node.
+  -> IO T.StringsStatCompletion
+  -- ^ The result when the request completes.
+  --
+  -- Throw one of the following exceptions if the request completes failed:
+  --
+  -- * ZNONODE the node does not exist.
+  -- * ZNOAUTH the client does not have permission.
+zooGetChildren2 zh path = CBytes.withCBytesUnsafe path $ \path' -> do
+  let csize = I.csize (Proxy :: Proxy T.StringsStatCompletion)
+      cfunc = I.c_hs_zoo_aget_children2 zh path' 0
+    in E.throwZooErrorIfLeft =<< I.withZKAsync csize I.peekRet I.peekData cfunc
+
+-- | Lists the children of a node, and get the parent stat.
+--
+-- This function is new in version 3.3.0
+--
+-- Note that there is only one thread for triggering callbacks. Which means this
+-- function will first block on the completion, and then wating on the watcher.
+--
+-- Throw one of the following exceptions on failure:
+--
+-- * 'E.ZBADARGUMENTS' - invalid input parameters
+-- * 'E.ZINVALIDSTATE' - zhandle state is either ZOO_SESSION_EXPIRED_STATE or ZOO_AUTH_FAILED_STATE
+-- * 'E.ZMARSHALLINGERROR' - failed to marshall a request; possibly, out of memory
+zooWatchGetChildren2
+  :: HasCallStack
+  => T.ZHandle
+  -- ^ The zookeeper handle obtained by a call to 'zookeeperResInit'
+  -> CBytes
+  -- ^ The name of the node. Expressed as a file name with slashes
+  -- separating ancestors of the node.
+  -> (T.HsWatcherCtx -> IO ())
+  -- ^ The watcher callback. A watch will be set at the server to notify
+  --  the client if the node changes.
+  -> (T.StringsStatCompletion -> IO ())
+  -- ^ The result callback when the request completes.
+  --
+  -- One of the following exceptions will be thrown if error happens:
+  --
+  -- * ZNONODE the node does not exist.
+  -- * ZNOAUTH the client does not have permission.
+  -> IO ()
+zooWatchGetChildren2 zh path watchfn strsStatfn =
+  let csize = I.csize (Proxy :: Proxy T.StringsStatCompletion)
+      watchfn' = watchfn <=< E.throwZooErrorIfLeft
+      stringsfn' = strsStatfn <=< E.throwZooErrorIfLeft
+   in CBytes.withCBytesUnsafe path $ \path' ->
+        I.withZKAsync2
+          I.hsWatcherCtxSize (\_ -> return E.CZOK) I.peekHsWatcherCtx watchfn'
+          csize I.peekRet I.peekData stringsfn'
+          (I.c_hs_zoo_awget_children2 zh path')
 
 -------------------------------------------------------------------------------
 

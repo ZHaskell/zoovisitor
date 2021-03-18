@@ -10,11 +10,12 @@ module ZooKeeper.Types
 
   , I.HsWatcherCtx (..)
 
-  , I.StringCompletion (..)
-  , I.StringsCompletion (..)
+  , I.VoidCompletion
   , I.DataCompletion (..)
   , I.StatCompletion (..)
-  , I.VoidCompletion
+  , I.StringCompletion (..)
+  , I.StringsCompletion (..)
+  , I.StringsStatCompletion (..)
 
   , I.ZooEvent
   , pattern I.ZooCreateEvent

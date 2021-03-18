@@ -74,6 +74,14 @@ typedef struct hs_strings_completion_t {
   const string_vector_t* strings;
 } hs_strings_completion_t;
 
+typedef struct hs_strings_stat_completion_t {
+  HsStablePtr mvar;
+  HsInt cap;
+  int rc;
+  const string_vector_t* strings;
+  const stat_t* stat;
+} hs_strings_stat_completion_t;
+
 // ----------------------------------------------------------------------------
 
 zhandle_t* hs_zookeeper_init(HsStablePtr mvar, HsInt cap,
@@ -117,6 +125,15 @@ int hs_zoo_awget_children(zhandle_t* zh, const char* path, HsStablePtr mvar_w,
                           HsStablePtr mvar_f, HsInt cap,
                           hs_watcher_ctx_t* watcher_ctx,
                           hs_strings_completion_t* strings_completion);
+
+int hs_zoo_aget_children2(zhandle_t* zh, const char* path, int watch,
+                          HsStablePtr mvar, HsInt cap,
+                          hs_strings_stat_completion_t* strings_stat);
+
+int hs_zoo_awget_children2(zhandle_t* zh, const char* path, HsStablePtr mvar_w,
+                           HsStablePtr mvar_f, HsInt cap,
+                           hs_watcher_ctx_t* watcher_ctx,
+                           hs_strings_stat_completion_t* strings_stat);
 
 // End define HS_ZK
 #endif

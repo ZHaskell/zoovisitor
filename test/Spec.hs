@@ -42,3 +42,4 @@ main = withResource client $ \zh -> hspec $ do
       watcherCtxType ctx' `shouldBe` ZooCreateEvent
       watcherCtxState ctx' `shouldBe` ZooConnectedState
       watcherCtxPath ctx' `shouldBe` Just "/b"
+      zooDelete zh "/b" Nothing `shouldReturn` ()

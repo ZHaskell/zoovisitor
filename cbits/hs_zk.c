@@ -168,6 +168,45 @@ void hs_strings_completion_fn(int rc, const string_vector_t* strings,
   hs_thread_done();
 }
 
+/**
+ * \brief signature of a completion function that returns a list of strings and
+ * stat.
+ * .
+ *
+ * This method will be invoked at the end of a asynchronous call and also as
+ * a result of connection loss or timeout.
+ * \param rc the error code of the call. Connection loss/timeout triggers
+ * the completion with one of the following error codes:
+ * ZCONNECTIONLOSS -- lost connection to the server
+ * ZOPERATIONTIMEOUT -- connection timed out
+ * Data related events trigger the completion with error codes listed the
+ * Exceptions section of the documentation of the function that initiated the
+ * call. (Zero indicates call was successful.)
+ * \param strings a pointer to the structure containng the list of strings of
+ * the names of the children of a node. If a non zero error code is returned,
+ *   the content of strings is undefined. The programmer is NOT responsible
+ *   for freeing strings.
+ * \param stat a pointer to the stat information for the node involved in
+ *   this function. If a non zero error code is returned, the content of
+ *   stat is undefined. The programmer is NOT responsible for freeing stat.
+ * \param data the pointer that was passed by the caller when the function
+ *   that this completion corresponds to was invoked. The programmer
+ *   is responsible for any memory freeing associated with the data
+ *   pointer.
+ */
+void hs_strings_stat_completion_fn(int rc, const string_vector_t* strings,
+                                   const struct Stat* stat, const void* data) {
+  hs_strings_stat_completion_t* strings_stat =
+      (hs_strings_stat_completion_t*)data;
+  strings_stat->rc = rc;
+  if (!rc) {
+    strings_stat->strings = dup_string_vector(strings);
+    strings_stat->stat = dup_stat(stat);
+  }
+  hs_try_putmvar(strings_stat->cap, strings_stat->mvar);
+  hs_thread_done();
+}
+
 // ----------------------------------------------------------------------------
 
 zhandle_t* hs_zookeeper_init(HsStablePtr mvar, HsInt cap,
@@ -264,6 +303,27 @@ int hs_zoo_awget_children(zhandle_t* zh, const char* path, HsStablePtr mvar_w,
   strings_completion->cap = cap;
   return zoo_awget_children(zh, path, hs_zookeeper_watcher_fn, watcher_ctx,
                             hs_strings_completion_fn, strings_completion);
+}
+
+int hs_zoo_aget_children2(zhandle_t* zh, const char* path, int watch,
+                          HsStablePtr mvar, HsInt cap,
+                          hs_strings_stat_completion_t* strings_stat) {
+  strings_stat->mvar = mvar;
+  strings_stat->cap = cap;
+  return zoo_aget_children2(zh, path, watch, hs_strings_stat_completion_fn,
+                            strings_stat);
+}
+
+int hs_zoo_awget_children2(zhandle_t* zh, const char* path, HsStablePtr mvar_w,
+                           HsStablePtr mvar_f, HsInt cap,
+                           hs_watcher_ctx_t* watcher_ctx,
+                           hs_strings_stat_completion_t* strings_stat) {
+  watcher_ctx->mvar = mvar_w;
+  watcher_ctx->cap = cap;
+  strings_stat->mvar = mvar_f;
+  strings_stat->cap = cap;
+  return zoo_awget_children2(zh, path, hs_zookeeper_watcher_fn, watcher_ctx,
+                             hs_strings_stat_completion_fn, strings_stat);
 }
 
 // ----------------------------------------------------------------------------

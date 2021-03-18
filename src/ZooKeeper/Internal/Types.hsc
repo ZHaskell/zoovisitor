@@ -220,8 +220,8 @@ data Stat = Stat
   , statPzxid          :: Int64
   } deriving (Show, Eq)
 
-peekStat :: Ptr Stat -> IO Stat
-peekStat ptr = Stat
+peekStat' :: Ptr Stat -> IO Stat
+peekStat' ptr = Stat
   <$> (#peek stat_t, czxid) ptr
   <*> (#peek stat_t, mzxid) ptr
   <*> (#peek stat_t, ctime) ptr
@@ -233,6 +233,9 @@ peekStat ptr = Stat
   <*> (#peek stat_t, dataLength) ptr
   <*> (#peek stat_t, numChildren) ptr
   <*> (#peek stat_t, pzxid) ptr
+
+peekStat :: Ptr Stat -> IO Stat
+peekStat ptr = peekStat' ptr <* free ptr
 
 newtype StringVector = StringVector [CBytes]
   deriving Show
@@ -305,7 +308,7 @@ instance Completion DataCompletion where
               then Just <$> Z.fromPtr val_ptr (fromIntegral val_len) <* free val_ptr
               else return Nothing
     stat_ptr <- (#peek hs_data_completion_t, stat) ptr
-    stat <- peekStat stat_ptr <* free stat_ptr
+    stat <- peekStat stat_ptr
     return $ DataCompletion val stat
 
 newtype StatCompletion = StatCompletion { statCompletionStat :: Stat }
@@ -316,7 +319,7 @@ instance Completion StatCompletion where
   peekRet ptr = (#peek hs_stat_completion_t, rc) ptr
   peekData ptr = do
     stat_ptr <- (#peek hs_stat_completion_t, stat) ptr
-    stat <- peekStat stat_ptr <* free stat_ptr
+    stat <- peekStat stat_ptr
     return $ StatCompletion stat
 
 newtype VoidCompletion = VoidCompletion ()
@@ -336,6 +339,21 @@ instance Completion StringsCompletion where
     strs_ptr <- (#peek hs_strings_completion_t, strings) ptr
     vals <- peekStringVector strs_ptr
     return $ StringsCompletion vals
+
+data StringsStatCompletion = StringsStatCompletion
+  { strsStatCompletionStrs :: StringVector
+  , strsStatCompletionStat :: Stat
+  } deriving Show
+
+instance Completion StringsStatCompletion where
+  csize _ = (#size hs_strings_stat_completion_t)
+  peekRet ptr = (#peek hs_strings_stat_completion_t, rc) ptr
+  peekData ptr = do
+    strs_ptr <- (#peek hs_strings_stat_completion_t, strings) ptr
+    vals <- peekStringVector strs_ptr
+    stat_ptr <- (#peek hs_strings_stat_completion_t, stat) ptr
+    stat <- peekStat stat_ptr
+    return $ StringsStatCompletion vals stat
 
 -------------------------------------------------------------------------------
 
