@@ -82,7 +82,7 @@ zhandle_t* hs_zookeeper_init(HsStablePtr mvar, HsInt cap,
                              int flags);
 
 int hs_zoo_acreate(zhandle_t* zh, const char* path, const char* value,
-                   int offset, int valuelen, const struct ACL_vector* acl,
+                   HsInt offset, HsInt valuelen, const struct ACL_vector* acl,
                    int mode, HsStablePtr mvar, HsInt cap,
                    hs_string_completion_t* string_completion);
 
@@ -93,9 +93,9 @@ int hs_zoo_awget(zhandle_t* zh, const char* path, HsStablePtr mvar_w,
                  HsStablePtr mvar_f, HsInt cap, hs_watcher_ctx_t* watcher_ctx,
                  hs_data_completion_t* data_completion);
 
-int hs_zoo_aset(zhandle_t* zh, const char* path, const char* buffer, int offset,
-                int buflen, int version, HsStablePtr mvar, HsInt cap,
-                hs_stat_completion_t* stat_completion);
+int hs_zoo_aset(zhandle_t* zh, const char* path, const char* buffer,
+                HsInt offset, HsInt buflen, int version, HsStablePtr mvar,
+                HsInt cap, hs_stat_completion_t* stat_completion);
 
 int hs_zoo_adelete(zhandle_t* zh, const char* path, int version,
                    HsStablePtr mvar, HsInt cap,

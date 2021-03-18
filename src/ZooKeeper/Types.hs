@@ -8,13 +8,28 @@ module ZooKeeper.Types
   , I.zooReadAclUnsafe
   , I.zooCreatorAllAcl
 
-  , I.HsWatcherCtx
+  , I.HsWatcherCtx (..)
 
   , I.StringCompletion (..)
   , I.StringsCompletion (..)
   , I.DataCompletion (..)
   , I.StatCompletion (..)
   , I.VoidCompletion
+
+  , I.ZooEvent
+  , pattern I.ZooCreateEvent
+  , pattern I.ZooDeleteEvent
+  , pattern I.ZooChangedEvent
+  , pattern I.ZooChildEvent
+  , pattern I.ZooSessionEvent
+  , pattern I.ZooNoWatchingEvent
+
+  , I.ZooState
+  , pattern I.ZooExpiredSession
+  , pattern I.ZooAuthFailed
+  , pattern I.ZooConnectingState
+  , pattern I.ZooAssociatingState
+  , pattern I.ZooConnectedState
 
   , I.CreateMode
   , pattern I.ZooPersistent

@@ -2,3 +2,6 @@ cradle:
   cabal:
     - path: "src"
       component: "lib:zoovisitor"
+
+    - path: "test"
+      component: "zoovisitor:test:zoovisitor-test"

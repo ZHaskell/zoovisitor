@@ -4,6 +4,7 @@ module ZooKeeper
 
   , zookeeperResInit
   , Res.withResource
+  , Res.Resource
 
   , zooCreate
   , zooSet
@@ -88,7 +89,7 @@ zooCreate :: HasCallStack
           -> CBytes
           -- ^ The name of the node. Expressed as a file name with slashes
           -- separating ancestors of the node.
-          -> Bytes
+          -> Maybe Bytes
           -- ^ The data to be stored in the node.
           -> T.AclVector
           -- ^ The initial ACL of the node. The ACL must not be null or empty.
@@ -103,12 +104,17 @@ zooCreate :: HasCallStack
           -- * ZNODEEXISTS the node already exists
           -- * ZNOAUTH the client does not have permission.
           -- * ZNOCHILDRENFOREPHEMERALS cannot create children of ephemeral nodes.
-zooCreate zh path value acl (I.CreateMode mode) =
+zooCreate zh path m_value acl (I.CreateMode mode) =
   CBytes.withCBytesUnsafe path $ \path' ->
-  Z.withPrimVectorUnsafe value $ \val' offset len ->
-    let csize = I.csize (Proxy :: Proxy T.StringCompletion)
-        cfunc = I.c_hs_zoo_acreate zh path' val' offset len acl mode
-     in E.throwZooErrorIfLeft =<< I.withZKAsync csize I.peekRet I.peekData cfunc
+    case m_value of
+      Just value -> Z.withPrimVectorUnsafe value $ \val' offset len -> do
+        let cfun = I.c_hs_zoo_acreate zh path' val' offset len acl mode
+        E.throwZooErrorIfLeft =<< I.withZKAsync csize I.peekRet I.peekData cfun
+      Nothing -> do
+        let cfun = I.c_hs_zoo_acreate' zh path' nullPtr 0 (-1) acl mode
+        E.throwZooErrorIfLeft =<< I.withZKAsync csize I.peekRet I.peekData cfun
+  where
+    csize = I.csize (Proxy :: Proxy T.StringCompletion)
 
 -- | Sets the data associated with a node.
 --
@@ -263,9 +269,8 @@ zooExists zh path =
 -- This function is similar to 'zooExists' except it allows one specify
 -- a watcher object. The function will be called once the watch has fired.
 --
--- Note that there is only one thread for triggering callbacks. Which means
--- this function will first block on the stat completion, and then wating on
--- the watcher.
+-- Note that there is only one thread for triggering callbacks. Which means this
+-- function will first block on the completion, and then wating on the watcher.
 --
 -- Throw one of the following exceptions on failure:
 --
@@ -334,10 +339,12 @@ zooGetChildren zh path = CBytes.withCBytesUnsafe path $ \path' -> do
 -- This function is similar to 'zooGetChildren' except it allows one specify
 -- a watcher object.
 --
+-- Note that there is only one thread for triggering callbacks. Which means this
+-- function will first block on the completion, and then wating on the watcher.
+--
 -- ZBADARGUMENTS - invalid input parameters
 -- ZINVALIDSTATE - zhandle state is either ZOO_SESSION_EXPIRED_STATE or ZOO_AUTH_FAILED_STATE
 -- ZMARSHALLINGERROR - failed to marshall a request; possibly, out of memory
---
 zooWatchGetChildren
   :: HasCallStack
   => T.ZHandle

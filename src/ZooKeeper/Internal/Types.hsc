@@ -24,7 +24,6 @@ newtype ZHandle = ZHandle { unZHandle :: Ptr () }
 newtype ClientID = ClientID { unClientID :: Ptr () }
   deriving (Show, Eq)
 
-
 newtype ZooLogLevel = ZooLogLevel CInt
   deriving (Eq, Storable)
 
@@ -240,7 +239,7 @@ newtype StringVector = StringVector [CBytes]
 
 peekStringVector :: Ptr StringVector -> IO StringVector
 peekStringVector ptr = bracket_ (return ()) (free ptr) $ do
-  -- Int32 is necessary, since count is int32_t in c
+  -- NOTE: Int32 is necessary, since count is int32_t in c
   count <- fromIntegral @Int32 <$> (#peek string_vector_t, count) ptr
   StringVector <$> forM [0..count-1] (peekStringVectorIdx ptr)
 
@@ -292,9 +291,9 @@ instance Completion StringCompletion where
     return $ StringCompletion value
 
 data DataCompletion = DataCompletion
-  { dataCompletionValue   :: Bytes
-  , dataCompletionStat    :: Stat
-  } deriving Show
+  { dataCompletionValue :: Maybe Bytes
+  , dataCompletionStat  :: Stat
+  } deriving (Show, Eq)
 
 instance Completion DataCompletion where
   csize _ = (#size hs_data_completion_t)
@@ -302,13 +301,15 @@ instance Completion DataCompletion where
   peekData ptr = do
     val_ptr <- (#peek hs_data_completion_t, value) ptr
     val_len :: CInt <- (#peek hs_data_completion_t, value_len) ptr
-    val <- Z.fromPtr val_ptr (fromIntegral val_len) <* free val_ptr
+    val <- if val_len >= 0
+              then Just <$> Z.fromPtr val_ptr (fromIntegral val_len) <* free val_ptr
+              else return Nothing
     stat_ptr <- (#peek hs_data_completion_t, stat) ptr
     stat <- peekStat stat_ptr <* free stat_ptr
     return $ DataCompletion val stat
 
 newtype StatCompletion = StatCompletion { statCompletionStat :: Stat }
-  deriving Show
+  deriving (Show, Eq)
 
 instance Completion StatCompletion where
   csize _ = (#size hs_stat_completion_t)

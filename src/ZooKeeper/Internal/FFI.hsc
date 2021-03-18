@@ -6,6 +6,7 @@ module ZooKeeper.Internal.FFI where
 import           Control.Concurrent
 import           Control.Exception
 import           Control.Monad            (void)
+import           Data.Version             (Version, makeVersion)
 import           Data.Word
 import           Foreign.C
 import           Foreign.ForeignPtr
@@ -13,8 +14,6 @@ import           Foreign.Ptr
 import           Foreign.StablePtr
 import           GHC.Conc
 import           GHC.Stack                (HasCallStack)
-import qualified Z.Data.Builder           as B
-import           Z.Data.Text              (Text)
 import           Z.Foreign                (BA##)
 
 import           ZooKeeper.Exception
@@ -24,13 +23,14 @@ import           ZooKeeper.Internal.Types
 
 -------------------------------------------------------------------------------
 
-zooVersion :: Text
+zooVersion :: Version
 #ifdef ZOO_MAJOR_VERSION
-zooVersion = B.buildText $ B.int @Int (#const ZOO_MAJOR_VERSION) <> "."
-                        <> B.int @Int (#const ZOO_MINOR_VERSION) <> "."
-                        <> B.int @Int (#const ZOO_PATCH_VERSION)
+zooVersion = makeVersion [ (#const ZOO_MAJOR_VERSION)
+                         , (#const ZOO_MINOR_VERSION)
+                         , (#const ZOO_PATCH_VERSION)
+                         ]
 #else
-zooVersion = "unsupported"
+zooVersion = [0, 0, 0]  -- unsupported
 #endif
 
 foreign import ccall unsafe "hs_zk.h &logLevel"
@@ -57,6 +57,15 @@ foreign import ccall unsafe "hs_zk.h hs_zoo_acreate"
     :: ZHandle
     -> BA## Word8
     -> BA## Word8 -> Int -> Int
+    -> AclVector
+    -> CInt
+    -> StablePtr PrimMVar -> Int -> Ptr StringCompletion
+    -> IO CInt
+foreign import ccall unsafe "hs_zk.h hs_zoo_acreate"
+  c_hs_zoo_acreate'
+    :: ZHandle
+    -> BA## Word8
+    -> Ptr CChar -> Int -> Int
     -> AclVector
     -> CInt
     -> StablePtr PrimMVar -> Int -> Ptr StringCompletion
