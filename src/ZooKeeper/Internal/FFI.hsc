@@ -52,6 +52,9 @@ foreign import ccall unsafe "hs_zk.h hs_zookeeper_init"
 foreign import ccall safe "hs_zk.h zookeeper_close"
   c_zookeeper_close_safe :: ZHandle -> IO CInt
 
+foreign import ccall unsafe "hs_zk.h zoo_client_id"
+  c_zoo_client_id :: ZHandle -> IO ClientID
+
 foreign import ccall unsafe "hs_zk.h hs_zoo_acreate"
   c_hs_zoo_acreate
     :: ZHandle

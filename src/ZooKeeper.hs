@@ -6,6 +6,8 @@ module ZooKeeper
   , Res.withResource
   , Res.Resource
 
+  , zooGetClientID
+
   , zooCreate
   , zooSet
   , zooGet
@@ -57,14 +59,13 @@ zookeeperResInit
   -> CInt
   -- ^ timeout
   -> Maybe T.ClientID
-  -- ^ clientid, the id of a previously established session that this
-  -- client will be reconnecting to. Pass 0 if not reconnecting to a previous
+  -- ^ The id of a previously established session that this client will be
+  -- reconnecting to. Pass 'Nothing' if not reconnecting to a previous
   -- session. Clients can access the session id of an established, valid,
-  -- connection by calling 'T.ClientID'. If the session corresponding to
+  -- connection by calling 'zooGetClientID'. If the session corresponding to
   -- the specified clientid has expired, or if the clientid is invalid for
-  -- any reason, the returned zhandle_t will be invalid -- the zhandle_t
-  -- state will indicate the reason for failure (typically
-  -- ZOO_EXPIRED_SESSION_STATE).
+  -- any reason, the returned 'T.ZHandle' will be invalid -- the 'T.ZHandle'
+  -- state will indicate the reason for failure (typically 'T.ZooExpiredSession').
   -> CInt
   -- ^ flags, reserved for future use. Should be set to zero.
   -> Res.Resource T.ZHandle
@@ -447,6 +448,13 @@ zooWatchGetChildren2 zh path watchfn strsStatfn =
 
 -------------------------------------------------------------------------------
 
+-- | Return the client session id, only valid if the connections
+-- is currently connected (ie. last watcher state is 'T.ZooConnectedState')
+zooGetClientID :: T.ZHandle -> IO T.ClientID
+zooGetClientID = I.c_zoo_client_id
+
+-------------------------------------------------------------------------------
+
 -- | Create a handle to used communicate with zookeeper.
 --
 -- This function creates a new handle and a zookeeper session that corresponds
@@ -465,14 +473,13 @@ zookeeperInit
   -> CInt
   -- ^ timeout
   -> Maybe T.ClientID
-  -- ^ clientid, the id of a previously established session that this
-  -- client will be reconnecting to. Pass 0 if not reconnecting to a previous
+  -- ^ The id of a previously established session that this client will be
+  -- reconnecting to. Pass 'Nothing' if not reconnecting to a previous
   -- session. Clients can access the session id of an established, valid,
-  -- connection by calling \ref zoo_client_id. If the session corresponding to
+  -- connection by calling 'zooGetClientID'. If the session corresponding to
   -- the specified clientid has expired, or if the clientid is invalid for
-  -- any reason, the returned zhandle_t will be invalid -- the zhandle_t
-  -- state will indicate the reason for failure (typically
-  -- ZOO_EXPIRED_SESSION_STATE).
+  -- any reason, the returned 'T.ZHandle' will be invalid -- the 'T.ZHandle'
+  -- state will indicate the reason for failure (typically 'T.ZooExpiredSession').
   -> CInt
   -- ^ flags, reserved for future use. Should be set to zero.
   -> IO T.ZHandle

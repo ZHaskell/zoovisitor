@@ -81,6 +81,28 @@ foreign import ccall unsafe "hs_zk.h &ZOO_CREATOR_ALL_ACL"
 
 -------------------------------------------------------------------------------
 
+-- | Interest Consts
+--
+-- These constants are used to express interest in an event and to
+-- indicate to zookeeper which events have occurred. They can
+-- be ORed together to express multiple interests. These flags are
+-- used in the interest and event parameters of
+-- \ref zookeeper_interest and \ref zookeeper_process.
+newtype ZooInterest = ZooInterest CInt
+  deriving (Eq, Storable)
+
+instance Show ZooInterest where
+  show ZookeeperWrite = "ZookeeperWrite"
+  show ZookeeperRead  = "ZookeeperRead"
+
+pattern ZookeeperWrite :: ZooInterest
+pattern ZookeeperWrite = ZooInterest (#const ZOOKEEPER_WRITE)
+
+pattern ZookeeperRead :: ZooInterest
+pattern ZookeeperRead = ZooInterest (#const ZOOKEEPER_READ)
+
+-------------------------------------------------------------------------------
+
 -- | State Consts
 --
 -- These constants represent the states of a zookeeper connection. They are
@@ -237,7 +259,7 @@ peekStat' ptr = Stat
 peekStat :: Ptr Stat -> IO Stat
 peekStat ptr = peekStat' ptr <* free ptr
 
-newtype StringVector = StringVector [CBytes]
+newtype StringVector = StringVector { unStrVec :: [CBytes] }
   deriving Show
 
 peekStringVector :: Ptr StringVector -> IO StringVector
@@ -329,7 +351,8 @@ instance Completion VoidCompletion where
   peekRet ptr = (#peek hs_stat_completion_t, rc) ptr
   peekData _ = return $ VoidCompletion ()
 
-newtype StringsCompletion = StringsCompletion StringVector
+newtype StringsCompletion = StringsCompletion
+  { strsCompletionValues :: StringVector }
   deriving Show
 
 instance Completion StringsCompletion where

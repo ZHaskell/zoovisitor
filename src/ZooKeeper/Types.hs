@@ -42,6 +42,8 @@ module ZooKeeper.Types
   , pattern I.ZooLogWarn
   , pattern I.ZooLogInfo
   , pattern I.ZooLogDebug
+
+  , I.StringVector (..)
   ) where
 
 import qualified ZooKeeper.Internal.Types as I
