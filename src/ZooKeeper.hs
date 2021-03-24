@@ -75,7 +75,7 @@ zookeeperResInit host timeout mclientid flags =
 -- | Create a node.
 --
 -- This method will create a node in ZooKeeper. A node can only be created if
--- it does not already exists. The Create Flags affect the creation of nodes.
+-- it does not already exist. The Create Flags affect the creation of nodes.
 -- If 'T.ZooEphemeral' flag is set, the node will automatically get removed if
 -- the client session goes away. If the 'T.ZooSequence' flag is set, a unique
 -- monotonically increasing sequence number is appended to the path name. The
@@ -271,6 +271,9 @@ zooExists zh path =
 --
 -- This function is similar to 'zooExists' except it allows one specify
 -- a watcher object. The function will be called once the watch has fired.
+--
+-- Note that the watch will fire both when the node is created and its associated
+-- data is set.
 --
 -- Note that there is only one thread for triggering callbacks. Which means this
 -- function will first block on the completion, and then wating on the watcher.
