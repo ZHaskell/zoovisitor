@@ -37,6 +37,9 @@ jobs:
       - name: Install zookeeper-dev on ubuntu
         if: runner.os == 'Linux'
         run: sudo apt-get update && sudo apt-get install libzookeeper-mt-dev
+      - name: Install zookeeper-dev on osx
+        if: runner.os == 'macOS'
+        run: brew install zookeeper
 
       - name: Setup zookeeper server
         run: docker run --name some-zookeeper -p 2182:2181 -d zookeeper
@@ -47,13 +50,24 @@ jobs:
           ghc-version: ${{ matrix.ghc }}
           cabal-version: ${{ matrix.cabal }}
 
-      - name: Build
+      - name: sdist
+        run: |
+          mkdir -p $HOME/sdist
+          cabal sdist --output-dir $HOME/sdist
+
+      - name: unpack
+        run: |
+          rm -rf $GITHUB_WORKSPACE/*
+          find $HOME/sdist -maxdepth 1 -type f -name '*.tar.gz' -exec tar -C $GITHUB_WORKSPACE -xzvf {} --strip 1 \;
+
+      - name: build
         run: cabal build --upgrade-dependencies --enable-tests --enable-benchmarks
 
-      - name: Test
+      - name: test
         run: cabal test --test-show-details=always
 
-      - name: Check
-        run: |
-          cabal check
-          cabal haddock
+      - name: check
+        run: cabal check
+
+      - name: haddock
+        run: cabal haddock
