@@ -8,6 +8,7 @@ import           Data.Int
 import           Data.Proxy        (Proxy (..))
 import           Foreign
 import           Foreign.C
+import           Numeric           (showHex)
 import           Z.Data.CBytes     (CBytes)
 import qualified Z.Data.CBytes     as CBytes
 import qualified Z.Data.Text       as Text
@@ -42,27 +43,36 @@ pattern ZooLogDebug = ZooLogLevel (#const ZOO_LOG_LEVEL_DEBUG)
 
 -------------------------------------------------------------------------------
 
--- | ACL consts.
-newtype Acl = Acl { unAcl :: CInt }
-  deriving (Show, Eq)
+-- | ACL permissions.
+newtype ZooPerm = ZooPerm { unAcl :: CInt }
+  deriving Eq
 
-pattern ZooPermRead :: Acl
-pattern ZooPermRead = Acl (#const ZOO_PERM_READ)
+instance Show ZooPerm where
+  show ZooPermRead   = "ZooPermRead"
+  show ZooPermWrite  = "ZooPermWrite"
+  show ZooPermCreate = "ZooPermCreate"
+  show ZooPermDelete = "ZooPermDelete"
+  show ZooPermAdmin  = "ZooPermAdmin"
+  show ZooPermAll    = "ZooPermAll"
+  show (ZooPerm x)   = "ZooPerm: 0x" ++ showHex x ""
 
-pattern ZooPermWrite :: Acl
-pattern ZooPermWrite = Acl (#const ZOO_PERM_WRITE)
+pattern ZooPermRead :: ZooPerm
+pattern ZooPermRead = ZooPerm (#const ZOO_PERM_READ)
 
-pattern ZooPermCreate :: Acl
-pattern ZooPermCreate = Acl (#const ZOO_PERM_CREATE)
+pattern ZooPermWrite :: ZooPerm
+pattern ZooPermWrite = ZooPerm (#const ZOO_PERM_WRITE)
 
-pattern ZooPermDelete :: Acl
-pattern ZooPermDelete = Acl (#const ZOO_PERM_DELETE)
+pattern ZooPermCreate :: ZooPerm
+pattern ZooPermCreate = ZooPerm (#const ZOO_PERM_CREATE)
 
-pattern ZooPermAdmin :: Acl
-pattern ZooPermAdmin = Acl (#const ZOO_PERM_ADMIN)
+pattern ZooPermDelete :: ZooPerm
+pattern ZooPermDelete = ZooPerm (#const ZOO_PERM_DELETE)
 
-pattern ZooPermAll :: Acl
-pattern ZooPermAll = Acl (#const ZOO_PERM_ALL)
+pattern ZooPermAdmin :: ZooPerm
+pattern ZooPermAdmin = ZooPerm (#const ZOO_PERM_ADMIN)
+
+pattern ZooPermAll :: ZooPerm
+pattern ZooPermAll = ZooPerm (#const ZOO_PERM_ALL)
 
 newtype AclVector = AclVector { unAclVector :: Ptr () }
   deriving (Show, Eq)
