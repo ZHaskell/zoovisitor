@@ -5,21 +5,26 @@ module Main where
 import           Control.Concurrent
 import           Control.Monad       (void)
 import           Data.Version        (makeVersion)
+import           Foreign.C
 import           Test.Hspec
 import           ZooKeeper
 import           ZooKeeper.Exception
 import           ZooKeeper.Types
 
+recvTimeout :: CInt
+recvTimeout = 5000
+
 client :: Resource ZHandle
-client = zookeeperResInit "127.0.0.1:2182" 5000 Nothing 0
+client = zookeeperResInit "127.0.0.1:2182" recvTimeout Nothing 0
 
 main :: IO ()
 main = withResource client $ \zh -> do
-  hspec $ smoke zh
-  hspec $ multiSpec zh
+  hspec $ opSpec zh
+  hspec $ multiOpSpec zh
+  hspec $ propSpec zh
 
-smoke :: ZHandle -> Spec
-smoke zh = do
+opSpec :: ZHandle -> Spec
+opSpec zh = do
   describe "ZooKeeper.zooVersion" $ do
     it "version should be 3.4.* - 3.6.*" $ do
       zooVersion `shouldSatisfy` (>= makeVersion [3, 4, 0])
@@ -70,16 +75,29 @@ smoke zh = do
       unStrVec . strsCompletionValues <$> zooGetChildren zh "/y" `shouldReturn` []
       zooDelete zh "/y" Nothing `shouldReturn` ()
 
+  describe "ZooKeeper.zooGetAcl" $ do
+    it "get acl of READ permission" $ do
+      void $ zooCreate zh "/acl1" Nothing zooReadAclUnsafe ZooEphemeral
+      compactZooPerms . aclPerms . head . aclCompletionAcls <$> zooGetAcl zh "/acl1"
+        `shouldReturn` ZooPermRead
+
+    it "get acl of ALL permission" $ do
+      void $ zooCreate zh "/acl2" Nothing zooOpenAclUnsafe ZooEphemeral
+      compactZooPerms . aclPerms . head . aclCompletionAcls <$> zooGetAcl zh "/acl2"
+        `shouldReturn` ZooPermAll
+
+propSpec :: ZHandle -> Spec
+propSpec zh = do
   describe "ZooKeeper.zooState" $ do
     it "test get state" $ do
       zooState zh `shouldReturn` ZooConnectedState
 
   describe "ZooKeeper.zooRecvTimeout" $ do
     it "test receive timeout" $ do
-      zooRecvTimeout zh `shouldReturn` 5000
+      zooRecvTimeout zh `shouldReturn` recvTimeout
 
-multiSpec :: ZHandle -> Spec
-multiSpec zh = describe "ZooKeeper.zooMulti" $ do
+multiOpSpec :: ZHandle -> Spec
+multiOpSpec zh = describe "ZooKeeper.zooMulti" $ do
   it "Test basic multi-op functionality" $ do
     let op0 = zooCreateOpInit "/multi" (Just "") 64 zooOpenAclUnsafe ZooPersistent
     let op1 = zooCreateOpInit "/multi/a" (Just "") 64 zooOpenAclUnsafe ZooPersistent

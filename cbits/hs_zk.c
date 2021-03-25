@@ -207,6 +207,41 @@ void hs_strings_stat_completion_fn(int rc, const string_vector_t* strings,
   hs_thread_done();
 }
 
+/**
+ * \brief signature of a completion function that returns an ACL.
+ *
+ * This method will be invoked at the end of a asynchronous call and also as
+ * a result of connection loss or timeout.
+ * \param rc the error code of the call. Connection loss/timeout triggers
+ * the completion with one of the following error codes:
+ * ZCONNECTIONLOSS -- lost connection to the server
+ * ZOPERATIONTIMEOUT -- connection timed out
+ * Data related events trigger the completion with error codes listed the
+ * Exceptions section of the documentation of the function that initiated the
+ * call. (Zero indicates call was successful.)
+ * \param acl a pointer to the structure containng the ACL of a node. If a non
+ *   zero error code is returned, the content of strings is undefined. The
+ *   programmer is NOT responsible for freeing acl.
+ * \param stat a pointer to the stat information for the node involved in
+ *   this function. If a non zero error code is returned, the content of
+ *   stat is undefined. The programmer is NOT responsible for freeing stat.
+ * \param data the pointer that was passed by the caller when the function
+ *   that this completion corresponds to was invoked. The programmer
+ *   is responsible for any memory freeing associated with the data
+ *   pointer.
+ */
+void hs_acl_completion_fn(int rc, struct ACL_vector* acl, struct Stat* stat,
+                          const void* data) {
+  hs_acl_completion_t* acl_completion = (hs_acl_completion_t*)data;
+  acl_completion->rc = rc;
+  if (!rc) {
+    acl_completion->acl = dup_acl_vector(acl);
+    acl_completion->stat = dup_stat(stat);
+  }
+  hs_try_putmvar(acl_completion->cap, acl_completion->mvar);
+  hs_thread_done();
+}
+
 // ----------------------------------------------------------------------------
 
 zhandle_t* hs_zookeeper_init(HsStablePtr mvar, HsInt cap,
@@ -219,6 +254,8 @@ zhandle_t* hs_zookeeper_init(HsStablePtr mvar, HsInt cap,
                                  clientid, watcher_ctx, flags);
   return zh;
 }
+
+// ----------------------------------------------------------------------------
 
 int hs_zoo_acreate(zhandle_t* zh, const char* path, const char* value,
                    HsInt offset, HsInt valuelen, const struct ACL_vector* acl,
@@ -326,6 +363,13 @@ int hs_zoo_awget_children2(zhandle_t* zh, const char* path, HsStablePtr mvar_w,
                              hs_strings_stat_completion_fn, strings_stat);
 }
 
+int hs_zoo_aget_acl(zhandle_t* zh, const char* path, HsStablePtr mvar,
+                    HsInt cap, hs_acl_completion_t* completion) {
+  completion->mvar = mvar;
+  completion->cap = cap;
+  return zoo_aget_acl(zh, path, hs_acl_completion_fn, completion);
+}
+
 int hs_zoo_amulti(zhandle_t* zh, int count, const zoo_op_t* ops,
                   zoo_op_result_t* results, HsStablePtr mvar, HsInt cap,
                   hs_void_completion_t* void_completion) {
@@ -348,5 +392,3 @@ void hs_zoo_set_op_init(zoo_op_t* op, const char* path, const char* value,
                         stat_t* stat) {
   zoo_set_op_init(op, path, value + valoffset, valuelen, version, stat);
 }
-
-// ----------------------------------------------------------------------------
