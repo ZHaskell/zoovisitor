@@ -20,6 +20,12 @@ module ZooKeeper
   , zooExists
   , zooWatchExists
 
+  , zooMulti
+  , zooCreateOpInit
+  , zooDeleteOpInit
+  , zooSetOpInit
+  , zooCheckOpInit
+
   , zookeeperInit
   , zookeeperClose
   ) where
@@ -27,13 +33,14 @@ module ZooKeeper
 import           Control.Concurrent       (forkIO, myThreadId, newEmptyMVar,
                                            takeMVar, threadCapability)
 import           Control.Exception        (mask_, onException)
-import           Control.Monad            (void, when, (<=<))
+import           Control.Monad            (void, when, zipWithM, (<=<))
+import           Data.Bifunctor           (first)
 import           Data.Maybe               (fromMaybe)
 import           Data.Proxy               (Proxy (..))
 import           Foreign.C                (CInt)
 import           Foreign.ForeignPtr       (mallocForeignPtrBytes,
                                            touchForeignPtr, withForeignPtr)
-import           Foreign.Ptr              (nullPtr)
+import           Foreign.Ptr              (Ptr, nullPtr, plusPtr)
 import           GHC.Conc                 (newStablePtrPrimMVar)
 import           GHC.Stack                (HasCallStack, callStack)
 import           Z.Data.CBytes            (CBytes)
@@ -107,7 +114,7 @@ zooCreate :: HasCallStack
           -- * ZNODEEXISTS the node already exists
           -- * ZNOAUTH the client does not have permission.
           -- * ZNOCHILDRENFOREPHEMERALS cannot create children of ephemeral nodes.
-zooCreate zh path m_value acl (I.CreateMode mode) =
+zooCreate zh path m_value acl mode =
   CBytes.withCBytesUnsafe path $ \path' ->
     case m_value of
       Just value -> Z.withPrimVectorUnsafe value $ \val' offset len -> do
@@ -132,7 +139,7 @@ zooSet :: HasCallStack
        -> CBytes
        -- ^ The name of the node. Expressed as a file name with slashes
        -- separating ancestors of the node.
-       -> Bytes
+       -> Maybe Bytes
        -- ^ Data to be written to the node.
        -> Maybe CInt
        -- ^ The expected version of the node. The function will fail
@@ -146,13 +153,16 @@ zooSet :: HasCallStack
        -- * ZNONODE the node does not exist.
        -- * ZNOAUTH the client does not have permission.
        -- * ZBADVERSION expected version does not match actual version.
-zooSet zh path value m_version =
-  CBytes.withCBytesUnsafe path $ \path' ->
-  Z.withPrimVectorUnsafe value $ \val' offset len ->
-    let csize = I.csize (Proxy :: Proxy T.StatCompletion)
-        cfunc = I.c_hs_zoo_aset zh path' val' offset len version
-        version = fromMaybe (-1) m_version
-     in E.throwZooErrorIfLeft =<< I.withZKAsync csize I.peekRet I.peekData cfunc
+zooSet zh path m_value m_version = CBytes.withCBytesUnsafe path $ \path' -> do
+  let csize = I.csize (Proxy :: Proxy T.StatCompletion)
+      version = fromMaybe (-1) m_version
+  case m_value of
+    Just value -> Z.withPrimVectorUnsafe value $ \val' offset len -> do
+      let cfunc = I.c_hs_zoo_aset zh path' val' offset len version
+      E.throwZooErrorIfLeft =<< I.withZKAsync csize I.peekRet I.peekData cfunc
+    Nothing -> do
+      let cfunc = I.c_hs_zoo_aset' zh path' nullPtr 0 (-1) version
+      E.throwZooErrorIfLeft =<< I.withZKAsync csize I.peekRet I.peekData cfunc
 
 -- | Gets the data associated with a node.
 --
@@ -449,12 +459,148 @@ zooWatchGetChildren2 zh path watchfn strsStatfn =
           csize I.peekRet I.peekData stringsfn'
           (I.c_hs_zoo_awget_children2 zh path')
 
--------------------------------------------------------------------------------
-
 -- | Return the client session id, only valid if the connections
 -- is currently connected (ie. last watcher state is 'T.ZooConnectedState')
 zooGetClientID :: T.ZHandle -> IO T.ClientID
 zooGetClientID = I.c_zoo_client_id
+
+-------------------------------------------------------------------------------
+
+-- | Atomically commits multiple zookeeper operations.
+--
+-- Throw exceptions if error happened, the exception will be any of the operations
+-- supported by a multi op, see 'zooCreate', 'zooDelete' and 'zooSet'.
+zooMulti
+  :: HasCallStack
+  => T.ZHandle
+  -- ^ The zookeeper handle obtained by a call to 'zookeeperResInit'
+  -> [T.ZooOp]
+  -- ^ An list of operations to commit
+  -> IO [T.ZooOpResult]
+zooMulti zh ops = do
+  let len = length ops
+      completionSize = I.csize (Proxy :: Proxy T.VoidCompletion)
+      chunkPtr ptr size = map (\i -> ptr `plusPtr` (i * size)) [0..len-1]
+
+  mbai@(Z.MutableByteArray mbai#) <- Z.newPinnedByteArray (I.zooOpSize * len)
+  mbar@(Z.MutableByteArray mbar#) <- Z.newPinnedByteArray (I.zooOpResultSize * len)
+  let ptr = Z.mutableByteArrayContents mbai
+      ptr_result = Z.mutableByteArrayContents mbar
+
+  res <- mapM initOp $ zip ops (chunkPtr ptr I.zooOpSize)
+  E.throwZooErrorIfLeft =<<
+    I.withZKAsync' (concatMap snd res) completionSize I.peekRet I.peekData
+                   (I.c_hs_zoo_amulti zh (fromIntegral len) mbai# mbar#)
+  zipWithM ($) (map fst res) (chunkPtr ptr_result I.zooOpResultSize)
+
+-- | Internal helper function to set zoo op.
+initOp :: (I.ZooOp, Ptr I.CZooOp)
+       -> IO (Ptr I.CZooOpResult -> IO T.ZooOpResult, I.TouchListBytes)
+-- we know that the size of this list is larger than one
+initOp (I.ZooCreateOp f, p) = first I.peekZooCreateOpResult `fmap` f p
+initOp (I.ZooDeleteOp f, p) = first (const I.peekZooDeleteOpResult) `fmap` f p
+initOp (I.ZooSetOp    f, p) = first I.peekZooSetOpResult `fmap` f p
+initOp (I.ZooCheckOp  f, p) = first (const I.peekZooCheckOpResult) `fmap` f p
+{-# INLINE initOp #-}
+
+-- | Init create op.
+--
+-- This function initializes a 'T.ZooOp' with the arguments for a ZOO_CREATE_OP.
+zooCreateOpInit
+  :: CBytes
+  -- ^ The name of the node. Expressed as a file name with slashes
+  -- separating ancestors of the node.
+  -> Maybe Bytes
+  -- ^ The data to be stored in the node.
+  -> CInt
+  -- ^ The max buffer size of the created new node path (this might be
+  -- different than the supplied path because of the 'T.ZooSequence' flag).
+  -- If this size is 0,
+  --
+  -- Note: we do NOT check if the size is non-negative.
+  --
+  -- If the path of the new node exceeds the buffer size, the path string will
+  -- be truncated to fit. The actual path of the new node in the server will
+  -- not be affected by the truncation.
+  -> T.AclVector
+  -- ^ The initial ACL of the node. The ACL must not be null or empty.
+  -> T.CreateMode
+  -- ^ This parameter can be set to 'T.ZooPersistent' for normal create
+  -- or an OR of the Create Flags
+  -> T.ZooOp
+zooCreateOpInit path m_value buflen acl mode = I.ZooCreateOp $ \op -> do
+  let buflen' = buflen + 1  -- including space for the null terminator
+  CBytes.withCBytesUnsafe path $ \path' -> do
+    mba@(Z.MutableByteArray mba#) <- Z.newPinnedByteArray (fromIntegral buflen')
+    case m_value of
+        Just value -> Z.withPrimVectorUnsafe value $ \val' offset len ->
+          I.c_hs_zoo_create_op_init op path' val' offset len acl mode mba# buflen'
+        Nothing ->
+          I.c_hs_zoo_create_op_init' op path' nullPtr 0 (-1) acl mode mba# buflen'
+    mba_path <- Z.unsafeThawByteArray $ Z.ByteArray path'
+    return (mba, [mba_path, mba])
+
+-- | Init delete op.
+--
+-- This function initializes a 'T.ZooOp' with the arguments for a ZOO_DELETE_OP.
+zooDeleteOpInit
+  :: CBytes
+  -- ^ The name of the node. Expressed as a file name with slashes
+  -- separating ancestors of the node.
+  -> Maybe CInt
+  -- ^ The expected version of the node. The function will fail
+  -- if the actual version of the node does not match the expected version.
+  -- If Nothing is used the version check will not take place.
+  -> T.ZooOp
+zooDeleteOpInit path m_version = I.ZooDeleteOp $ \op -> do
+  CBytes.withCBytesUnsafe path $ \path' -> do
+    I.c_zoo_delete_op_init op path' (fromMaybe (-1) m_version)
+    mba_path <- Z.unsafeThawByteArray $ Z.ByteArray path'
+    return ((), [mba_path])
+
+-- | Init set op.
+--
+-- This function initializes an 'T.ZooOp' with the arguments for a ZOO_SETDATA_OP.
+zooSetOpInit
+  :: CBytes
+  -- ^ The name of the node. Expressed as a file name with slashes
+  -- separating ancestors of the node.
+  -> Maybe Bytes
+  -- ^ Data to be written to the node.
+  --
+  --  To set NULL as data use this parameter as Nothing.
+  -> Maybe CInt
+  -- ^ The expected version of the node. The function will fail
+  -- if the actual version of the node does not match the expected version.
+  -- If Nothing is used the version check will not take place.
+  -> T.ZooOp
+zooSetOpInit path m_value m_version = I.ZooSetOp $ \op -> do
+  CBytes.withCBytesUnsafe path $ \path' -> do
+    mba@(Z.MutableByteArray mba#) <- Z.newPinnedByteArray I.statSize
+    let version = fromMaybe (-1) m_version
+    case m_value of
+      Just value -> Z.withPrimVectorUnsafe value $ \val' offset len ->
+        I.c_hs_zoo_set_op_init op path' val' offset len version mba#
+      Nothing -> I.c_hs_zoo_set_op_init' op path' nullPtr 0 (-1) version mba#
+    mba_path <- Z.unsafeThawByteArray $ Z.ByteArray path'
+    return (mba, [mba_path, mba])
+
+-- | Init check op.
+--
+-- This function initializes an 'T.ZooOp' with the arguments for a ZOO_CHECK_OP.
+zooCheckOpInit
+  :: CBytes
+  -- ^ The name of the node. Expressed as a file name with slashes
+  -- separating ancestors of the node.
+  -> CInt       -- FIXME: does this can set to -1 ?
+  -- ^ The expected version of the node. The function will fail
+  -- if the actual version of the node does not match the expected version.
+  -> T.ZooOp
+zooCheckOpInit path version = I.ZooCheckOp $ \op -> do
+  CBytes.withCBytesUnsafe path $ \path' -> do
+    I.c_zoo_check_op_init op path' version
+    mba_path <- Z.unsafeThawByteArray $ Z.ByteArray path'
+    return ((), [mba_path])
 
 -------------------------------------------------------------------------------
 

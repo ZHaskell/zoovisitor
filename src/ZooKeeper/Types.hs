@@ -1,7 +1,9 @@
 module ZooKeeper.Types
   ( I.ZHandle
-
   , I.ClientID
+
+  , I.ZooOp
+  , I.ZooOpResult (..)
 
   , I.AclVector
   , I.zooOpenAclUnsafe

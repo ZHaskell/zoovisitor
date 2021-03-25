@@ -135,5 +135,18 @@ int hs_zoo_awget_children2(zhandle_t* zh, const char* path, HsStablePtr mvar_w,
                            hs_watcher_ctx_t* watcher_ctx,
                            hs_strings_stat_completion_t* strings_stat);
 
+int hs_zoo_amulti(zhandle_t* zh, int count, const zoo_op_t* ops,
+                  zoo_op_result_t* results, HsStablePtr mvar, HsInt cap,
+                  hs_void_completion_t* void_completion);
+
+void hs_zoo_create_op_init(zoo_op_t* op, const char* path, const char* value,
+                           HsInt valoffset, HsInt valuelen,
+                           const struct ACL_vector* acl, int flags,
+                           char* path_buffer, int path_buffer_len);
+
+void hs_zoo_set_op_init(zoo_op_t* op, const char* path, const char* value,
+                        HsInt valoffset, HsInt valuelen, int version,
+                        stat_t* stat);
+
 // End define HS_ZK
 #endif

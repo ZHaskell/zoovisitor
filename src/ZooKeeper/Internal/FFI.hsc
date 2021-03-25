@@ -14,7 +14,7 @@ import           Foreign.Ptr
 import           Foreign.StablePtr
 import           GHC.Conc
 import           GHC.Stack                (HasCallStack)
-import           Z.Foreign                (BA##)
+import           Z.Foreign
 
 import           ZooKeeper.Exception
 import           ZooKeeper.Internal.Types
@@ -61,7 +61,7 @@ foreign import ccall unsafe "hs_zk.h hs_zoo_acreate"
     -> BA## Word8
     -> BA## Word8 -> Int -> Int
     -> AclVector
-    -> CInt
+    -> CreateMode
     -> StablePtr PrimMVar -> Int -> Ptr StringCompletion
     -> IO CInt
 foreign import ccall unsafe "hs_zk.h hs_zoo_acreate"
@@ -70,7 +70,7 @@ foreign import ccall unsafe "hs_zk.h hs_zoo_acreate"
     -> BA## Word8
     -> Ptr CChar -> Int -> Int
     -> AclVector
-    -> CInt
+    -> CreateMode
     -> StablePtr PrimMVar -> Int -> Ptr StringCompletion
     -> IO CInt
 
@@ -79,6 +79,14 @@ foreign import ccall unsafe "hs_zk.h hs_zoo_aset"
     :: ZHandle
     -> BA## Word8
     -> BA## Word8 -> Int -> Int
+    -> CInt
+    -> StablePtr PrimMVar -> Int -> Ptr StatCompletion
+    -> IO CInt
+foreign import ccall unsafe "hs_zk.h hs_zoo_aset"
+  c_hs_zoo_aset'
+    :: ZHandle
+    -> BA## Word8
+    -> Ptr Word8 -> Int -> Int
     -> CInt
     -> StablePtr PrimMVar -> Int -> Ptr StatCompletion
     -> IO CInt
@@ -144,26 +152,84 @@ foreign import ccall unsafe "hs_zk.h hs_zoo_awget_children2"
     -> Ptr HsWatcherCtx -> Ptr StringsStatCompletion
     -> IO CInt
 
+foreign import ccall unsafe "hs_zk.h hs_zoo_amulti"
+  c_hs_zoo_amulti
+    :: ZHandle -> CInt
+    -> MBA## CZooOp           -- Ptr CZooOp
+    -> MBA## CZooOpResult     -- Ptr CZooOpResult
+    -> StablePtr PrimMVar -> Int -> Ptr VoidCompletion
+    -> IO CInt
+
+foreign import ccall unsafe "hs_zk.h hs_zoo_create_op_init"
+  c_hs_zoo_create_op_init
+    :: Ptr CZooOp
+    -> BA## Word8           -- ^ path
+    -> BA## Word8 -> Int -> Int
+    -> AclVector
+    -> CreateMode
+    -> MBA## Word8 -> CInt   -- ^ (path_buffer, path_buffer_len)
+    -> IO ()
+foreign import ccall unsafe "hs_zk.h hs_zoo_create_op_init"
+  c_hs_zoo_create_op_init'
+    :: Ptr CZooOp
+    -> BA## Word8
+    -> Ptr CChar -> Int -> Int
+    -> AclVector
+    -> CreateMode
+    -> MBA## Word8 -> CInt
+    -> IO ()
+
+foreign import ccall unsafe "hs_zk.h zoo_delete_op_init"
+  c_zoo_delete_op_init :: Ptr CZooOp -> BA## Word8 -> CInt -> IO ()
+
+foreign import ccall unsafe "hs_zk.h hs_zoo_set_op_init"
+  c_hs_zoo_set_op_init
+    :: Ptr CZooOp
+    -> BA## Word8
+    -> BA## Word8 -> Int -> Int
+    -> CInt
+    -> MBA## Word8     -- pointer to Stat
+    -> IO ()
+foreign import ccall unsafe "hs_zk.h hs_zoo_set_op_init"
+  c_hs_zoo_set_op_init'
+    :: Ptr CZooOp
+    -> BA## Word8
+    -> Ptr Word8 -> Int -> Int
+    -> CInt
+    -> MBA## Word8     -- pointer to Stat
+    -> IO ()
+
+foreign import ccall unsafe "hs_zk.h zoo_check_op_init"
+  c_zoo_check_op_init :: Ptr CZooOp -> BA## Word8 -> CInt -> IO ()
+
 -------------------------------------------------------------------------------
--- Misc
+-- Helpers
 
 withZKAsync :: HasCallStack
             => Int -> (Ptr a -> IO CInt) -> (Ptr a -> IO a)
             -> (StablePtr PrimMVar -> Int -> Ptr a -> IO CInt)
             -> IO (Either CInt a)
+withZKAsync = withZKAsync' []
 {-# INLINE withZKAsync #-}
-withZKAsync size peek_result peek_data f = mask_ $ do
+
+withZKAsync' :: HasCallStack
+             => TouchListBytes
+             -> Int -> (Ptr a -> IO CInt) -> (Ptr a -> IO a)
+             -> (StablePtr PrimMVar -> Int -> Ptr a -> IO CInt)
+             -> IO (Either CInt a)
+withZKAsync' bas size peek_result peek_data f = mask_ $ do
   mvar <- newEmptyMVar
   sp <- newStablePtrPrimMVar mvar
   fp <- mallocForeignPtrBytes size
   withForeignPtr fp $ \data' -> do
     (cap, _) <- threadCapability =<< myThreadId
     void $ throwZooErrorIfNotOK =<< f sp cap data'
-    takeMVar mvar `onException` forkIO (do takeMVar mvar; touchForeignPtr fp)
+    takeMVar mvar `onException` forkIO (do takeMVar mvar; touchForeignPtr fp; touch bas)
     rc <- peek_result data'
     case rc of
       CZOK -> Right <$> peek_data data'
       _    -> return $ Left rc
+{-# INLINE withZKAsync' #-}
 
 withZKAsync2
   :: HasCallStack
@@ -173,7 +239,6 @@ withZKAsync2
   -> (Either CInt b -> IO ())
   -> (StablePtr PrimMVar -> StablePtr PrimMVar -> Int -> Ptr a -> Ptr b -> IO CInt)
   -> IO ()
-{-# INLINE withZKAsync2 #-}
 withZKAsync2 size1 peekRet1 peekData1 f1 size2 peekRet2 peekData2 f2 g = mask_ $ do
   mvar1 <- newEmptyMVar
   sp1 <- newStablePtrPrimMVar mvar1
@@ -188,7 +253,7 @@ withZKAsync2 size1 peekRet1 peekData1 f1 size2 peekRet2 peekData2 f2 g = mask_ $
       (cap, _) <- threadCapability =<< myThreadId
       void $ throwZooErrorIfNotOK =<< g sp1 sp2 cap data1' data2'
 
-      takeMVar mvar2 `onException` forkIO (do takeMVar mvar2; touchForeignPtr fp2)
+      takeMVar mvar2 `onException` forkIO (do takeMVar mvar2; touchForeignPtr fp2; touchForeignPtr fp1)
       rc2 <- peekRet2 data2'
       case rc2 of
         CZOK -> f2 =<< Right <$> peekData2 data2'
@@ -199,3 +264,4 @@ withZKAsync2 size1 peekRet1 peekData1 f1 size2 peekRet2 peekData2 f2 g = mask_ $
       case rc1 of
         CZOK -> f1 =<< Right <$> peekData1 data1'
         _    -> f1 $ Left rc1
+{-# INLINE withZKAsync2 #-}

@@ -87,13 +87,14 @@ foreign import ccall unsafe "hs_zk.h &ZOO_CREATOR_ALL_ACL"
 -- indicate to zookeeper which events have occurred. They can
 -- be ORed together to express multiple interests. These flags are
 -- used in the interest and event parameters of
--- \ref zookeeper_interest and \ref zookeeper_process.
+-- zookeeper_interest and zookeeper_process.
 newtype ZooInterest = ZooInterest CInt
   deriving (Eq, Storable)
 
 instance Show ZooInterest where
-  show ZookeeperWrite = "ZookeeperWrite"
-  show ZookeeperRead  = "ZookeeperRead"
+  show ZookeeperWrite  = "ZookeeperWrite"
+  show ZookeeperRead   = "ZookeeperRead"
+  show (ZooInterest x) = "ZooInterest: " <> show x
 
 pattern ZookeeperWrite :: ZooInterest
 pattern ZookeeperWrite = ZooInterest (#const ZOOKEEPER_WRITE)
@@ -197,7 +198,7 @@ pattern ZooNoWatchingEvent = ZooEvent (#const ZOO_NOTWATCHING_EVENT)
 
 -- | These modes are used by zoo_create to affect node create.
 newtype CreateMode = CreateMode { unCreateMode :: CInt }
-  deriving (Show, Eq)
+  deriving (Show, Eq, Storable)
 
 pattern ZooPersistent :: CreateMode
 pattern ZooPersistent = CreateMode 0
@@ -241,6 +242,9 @@ data Stat = Stat
   , statNumChildren    :: Int32
   , statPzxid          :: Int64
   } deriving (Show, Eq)
+
+statSize :: Int
+statSize = (#size stat_t)
 
 peekStat' :: Ptr Stat -> IO Stat
 peekStat' ptr = Stat
@@ -380,12 +384,49 @@ instance Completion StringsStatCompletion where
 
 -------------------------------------------------------------------------------
 
--- This structure holds all the arguments necessary for one op as part
--- of a containing multi_op via 'zoo_multi' or 'zoo_amulti'.
--- This structure should be treated as opaque and initialized via
--- 'zoo_create_op_init', 'zoo_delete_op_init', 'zoo_set_op_init'
--- and 'zoo_check_op_init'.
-data ZooOp
+data CZooOp
+data CZooOpResult
 
 zooOpSize :: Int
 zooOpSize = (#size zoo_op_t)
+
+zooOpResultSize :: Int
+zooOpResultSize = (#size zoo_op_result_t)
+
+-- only safe on /pinned/ byte array
+type ResultBytes = Z.MutableByteArray Z.RealWorld
+type TouchListBytes = [Z.MutableByteArray Z.RealWorld]
+
+-- | This structure holds all the arguments necessary for one op as part of a
+-- containing multi_op via 'ZooKeeper.zooMulti'.
+data ZooOp
+  = ZooCreateOp (Ptr CZooOp -> IO (ResultBytes, TouchListBytes))
+  | ZooDeleteOp (Ptr CZooOp -> IO ((), TouchListBytes))
+  | ZooSetOp    (Ptr CZooOp -> IO (ResultBytes, TouchListBytes))
+  | ZooCheckOp  (Ptr CZooOp -> IO ((), TouchListBytes))
+
+data ZooOpResult
+  = ZooCreateOpResult CInt CBytes
+  | ZooDeleteOpResult CInt
+  | ZooSetOpResult    CInt Stat
+  | ZooCheckOpResult  CInt
+  deriving (Show, Eq)
+
+peekZooCreateOpResult :: ResultBytes -> Ptr CZooOpResult -> IO ZooOpResult
+peekZooCreateOpResult (Z.MutableByteArray ba##) ptr = do
+  ret <- (#peek zoo_op_result_t, err) ptr
+  value <- CBytes.fromMutablePrimArray $ Z.MutablePrimArray ba##
+  return $ ZooCreateOpResult ret value
+
+peekZooDeleteOpResult :: Ptr CZooOpResult -> IO ZooOpResult
+peekZooDeleteOpResult ptr = ZooDeleteOpResult <$> (#peek zoo_op_result_t, err) ptr
+
+peekZooSetOpResult :: ResultBytes -> Ptr CZooOpResult -> IO ZooOpResult
+peekZooSetOpResult mba ptr = do
+  ret <- (#peek zoo_op_result_t, err) ptr
+  ba <- Z.unsafeFreezeByteArray mba
+  stat <- peekStat' $ castPtr $ Z.byteArrayContents ba
+  return $ ZooSetOpResult ret stat
+
+peekZooCheckOpResult :: Ptr CZooOpResult -> IO ZooOpResult
+peekZooCheckOpResult ptr = ZooCheckOpResult <$> (#peek zoo_op_result_t, err) ptr

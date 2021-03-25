@@ -1,5 +1,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 
+module Main where
+
 import           Control.Concurrent
 import           Control.Monad       (void)
 import           Data.Version        (makeVersion)
@@ -12,7 +14,12 @@ client :: Resource ZHandle
 client = zookeeperResInit "127.0.0.1:2182" 5000 Nothing 0
 
 main :: IO ()
-main = withResource client $ \zh -> hspec $ do
+main = withResource client $ \zh -> do
+  hspec $ smoke zh
+  hspec $ multiSpec zh
+
+smoke :: ZHandle -> Spec
+smoke zh = do
   describe "ZooKeeper.zooVersion" $ do
     it "version should be 3.4.*" $ do
       zooVersion `shouldSatisfy` (>= makeVersion [3, 4, 0])
@@ -22,7 +29,7 @@ main = withResource client $ \zh -> hspec $ do
     it "set some value to a node and get it" $ do
       let nodeName = "/test-node"
       void $ zooCreate zh nodeName Nothing zooOpenAclUnsafe ZooEphemeral
-      void $ zooSet zh nodeName "hello" Nothing
+      void $ zooSet zh nodeName (Just "hello") Nothing
       (dataCompletionValue <$> zooGet zh nodeName) `shouldReturn` Just "hello"
 
   describe "ZooKeeper.zooGet" $ do
@@ -47,7 +54,7 @@ main = withResource client $ \zh -> hspec $ do
       void $ zooCreate zh "/x" Nothing zooOpenAclUnsafe ZooPersistent
       void $ zooCreate zh "/x/1" Nothing zooOpenAclUnsafe ZooPersistent
       void $ zooCreate zh "/x/2" Nothing zooOpenAclUnsafe ZooPersistent
-      (unStrVec . strsCompletionValues) <$> zooGetChildren zh "/x" `shouldReturn` ["1", "2"]
+      unStrVec . strsCompletionValues <$> zooGetChildren zh "/x" `shouldReturn` ["1", "2"]
       zooDelete zh "/x/1" Nothing `shouldReturn` ()
       zooDelete zh "/x/2" Nothing `shouldReturn` ()
       zooDelete zh "/x" Nothing `shouldReturn` ()
@@ -60,8 +67,31 @@ main = withResource client $ \zh -> hspec $ do
 
     it "get children of a leaf node should return []" $ do
       void $ zooCreate zh "/y" Nothing zooOpenAclUnsafe ZooPersistent
-      (unStrVec . strsCompletionValues) <$> zooGetChildren zh "/y" `shouldReturn` []
+      unStrVec . strsCompletionValues <$> zooGetChildren zh "/y" `shouldReturn` []
       zooDelete zh "/y" Nothing `shouldReturn` ()
+
+multiSpec :: ZHandle -> Spec
+multiSpec zh = describe "ZooKeeper.zooMulti" $ do
+  it "Test basic multi-op functionality" $ do
+    let op0 = zooCreateOpInit "/multi" (Just "") 64 zooOpenAclUnsafe ZooPersistent
+    let op1 = zooCreateOpInit "/multi/a" (Just "") 64 zooOpenAclUnsafe ZooPersistent
+    let op2 = zooSetOpInit "/multi/a" (Just "hello") Nothing
+    let op3 = zooDeleteOpInit "/multi/a" Nothing
+    let op4 = zooDeleteOpInit "/multi" Nothing
+
+    results <- zooMulti zh [op0, op1, op2]
+    head results `shouldBe` ZooCreateOpResult CZOK "/multi"
+    results !! 1 `shouldBe` ZooCreateOpResult CZOK "/multi/a"
+    case results !! 2 of
+      ZooSetOpResult ret _ -> ret `shouldBe` CZOK
+      _                    -> error "Invalid Op Result"
+    (dataCompletionValue <$> zooGet zh "/multi/a") `shouldReturn` Just "hello"
+    results' <- zooMulti zh [op3, op4]
+    head results' `shouldBe` ZooDeleteOpResult CZOK
+    results' !! 1 `shouldBe` ZooDeleteOpResult CZOK
+    zooExists zh "/multi" `shouldReturn` Nothing
+
+-------------------------------------------------------------------------------
 
 noChildrenForEphemerals :: Selector ZNOCHILDRENFOREPHEMERALS
 noChildrenForEphemerals = const True

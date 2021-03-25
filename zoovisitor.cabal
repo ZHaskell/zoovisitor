@@ -39,9 +39,9 @@ library
     ZooKeeper.Internal.Types
 
   build-depends:
-    , base       >=4.12 && <5
-    , primitive  >=0.6  && <0.8
-    , Z-Data     ^>=0.7
+    , base       >=4.12  && <5
+    , primitive  >=0.6   && <0.8
+    , Z-Data     >=0.7.2 && <1.0
     , Z-IO       ^>=0.7
 
   includes:           hs_zk.h
@@ -64,6 +64,7 @@ library
     PatternSynonyms
     PolyKinds
     RankNTypes
+    RecordWildCards
     ScopedTypeVariables
     StandaloneDeriving
     TypeApplications
