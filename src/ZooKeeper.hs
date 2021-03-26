@@ -36,7 +36,6 @@ import           Control.Exception        (mask_, onException)
 import           Control.Monad            (void, when, zipWithM, (<=<))
 import           Data.Bifunctor           (first)
 import           Data.Maybe               (fromMaybe)
-import           Data.Proxy               (Proxy (..))
 import           Foreign.C                (CInt)
 import           Foreign.ForeignPtr       (mallocForeignPtrBytes,
                                            touchForeignPtr, withForeignPtr)
@@ -124,7 +123,7 @@ zooCreate zh path m_value acl mode =
         let cfun = I.c_hs_zoo_acreate' zh path' nullPtr 0 (-1) acl mode
         E.throwZooErrorIfLeft =<< I.withZKAsync csize I.peekRet I.peekData cfun
   where
-    csize = I.csize (Proxy :: Proxy T.StringCompletion)
+    csize = I.csize @T.StringCompletion
 
 -- | Sets the data associated with a node.
 --
@@ -154,7 +153,7 @@ zooSet :: HasCallStack
        -- * ZNOAUTH the client does not have permission.
        -- * ZBADVERSION expected version does not match actual version.
 zooSet zh path m_value m_version = CBytes.withCBytesUnsafe path $ \path' -> do
-  let csize = I.csize (Proxy :: Proxy T.StatCompletion)
+  let csize = I.csize @T.StatCompletion
       version = fromMaybe (-1) m_version
   case m_value of
     Just value -> Z.withPrimVectorUnsafe value $ \val' offset len -> do
@@ -184,7 +183,7 @@ zooGet :: HasCallStack
        -- * ZNONODE the node does not exist.
        -- * ZNOAUTH the client does not have permission.
 zooGet zh path = CBytes.withCBytesUnsafe path $ \path' ->
-  let csize = I.csize (Proxy :: Proxy T.DataCompletion)
+  let csize = I.csize @T.DataCompletion
       cfunc = I.c_hs_zoo_aget zh path' 0
     in E.throwZooErrorIfLeft =<< I.withZKAsync csize I.peekRet I.peekData cfunc
 
@@ -212,7 +211,7 @@ zooWatchGet
   -- * ZNOAUTH the client does not have permission.
   -> IO ()
 zooWatchGet zh path watchfn datafn = CBytes.withCBytesUnsafe path $ \path' ->
-  let csize = I.csize (Proxy :: Proxy T.DataCompletion)
+  let csize = I.csize @T.DataCompletion
       watchfn' = watchfn <=< E.throwZooErrorIfLeft
       datafn' = datafn <=< E.throwZooErrorIfLeft
    in I.withZKAsync2
@@ -246,7 +245,7 @@ zooDelete :: HasCallStack
           -- If Nothing is used the version check will not take place.
           -> IO ()
 zooDelete zh path m_version = CBytes.withCBytesUnsafe path $ \path' ->
-  let csize = I.csize (Proxy :: Proxy T.VoidCompletion)
+  let csize = I.csize @T.VoidCompletion
       cfunc = I.c_hs_zoo_adelete zh path' version
       version = fromMaybe (-1) m_version
    in void $ E.throwZooErrorIfLeft =<< I.withZKAsync csize I.peekRet I.peekData cfunc
@@ -273,7 +272,7 @@ zooExists :: HasCallStack
           -- * ZNOAUTH the client does not have permission.
 zooExists zh path =
   CBytes.withCBytesUnsafe path $ \path' ->
-    let csize = I.csize (Proxy :: Proxy T.StatCompletion)
+    let csize = I.csize @T.StatCompletion
         cfunc = I.c_hs_zoo_aexists zh path' 0
      in E.throwZooErrorIfLeft' (== E.CZNONODE) =<< I.withZKAsync csize I.peekRet I.peekData cfunc
 
@@ -315,7 +314,7 @@ zooWatchExists
   -- * ZNOAUTH the client does not have permission.
   -> IO ()
 zooWatchExists zh path watchfn statfn =
-  let csize = I.csize (Proxy :: Proxy T.StatCompletion)
+  let csize = I.csize @T.StatCompletion
       watchfn' = watchfn <=< E.throwZooErrorIfLeft
       statfn' = statfn <=< E.throwZooErrorIfLeft' (== E.CZNONODE)
    in CBytes.withCBytesUnsafe path $ \path' ->
@@ -346,7 +345,7 @@ zooGetChildren
   -- * ZNONODE the node does not exist.
   -- * ZNOAUTH the client does not have permission.
 zooGetChildren zh path = CBytes.withCBytesUnsafe path $ \path' -> do
-  let csize = I.csize (Proxy :: Proxy T.StringsCompletion)
+  let csize = I.csize @T.StringsCompletion
       cfunc = I.c_hs_zoo_aget_children zh path' 0
     in E.throwZooErrorIfLeft =<< I.withZKAsync csize I.peekRet I.peekData cfunc
 
@@ -382,7 +381,7 @@ zooWatchGetChildren
   -- * ZNOAUTH the client does not have permission.
   -> IO ()
 zooWatchGetChildren zh path watchfn stringsfn =
-  let csize = I.csize (Proxy :: Proxy T.StringsCompletion)
+  let csize = I.csize @T.StringsCompletion
       watchfn' = watchfn <=< E.throwZooErrorIfLeft
       stringsfn' = stringsfn <=< E.throwZooErrorIfLeft
    in CBytes.withCBytesUnsafe path $ \path' ->
@@ -415,7 +414,7 @@ zooGetChildren2
   -- * ZNONODE the node does not exist.
   -- * ZNOAUTH the client does not have permission.
 zooGetChildren2 zh path = CBytes.withCBytesUnsafe path $ \path' -> do
-  let csize = I.csize (Proxy :: Proxy T.StringsStatCompletion)
+  let csize = I.csize @T.StringsStatCompletion
       cfunc = I.c_hs_zoo_aget_children2 zh path' 0
     in E.throwZooErrorIfLeft =<< I.withZKAsync csize I.peekRet I.peekData cfunc
 
@@ -450,7 +449,7 @@ zooWatchGetChildren2
   -- * ZNOAUTH the client does not have permission.
   -> IO ()
 zooWatchGetChildren2 zh path watchfn strsStatfn =
-  let csize = I.csize (Proxy :: Proxy T.StringsStatCompletion)
+  let csize = I.csize @T.StringsStatCompletion
       watchfn' = watchfn <=< E.throwZooErrorIfLeft
       stringsfn' = strsStatfn <=< E.throwZooErrorIfLeft
    in CBytes.withCBytesUnsafe path $ \path' ->
@@ -479,7 +478,7 @@ zooMulti
   -> IO [T.ZooOpResult]
 zooMulti zh ops = do
   let len = length ops
-      completionSize = I.csize (Proxy :: Proxy T.VoidCompletion)
+      completionSize = I.csize @T.VoidCompletion
       chunkPtr ptr size = map (\i -> ptr `plusPtr` (i * size)) [0..len-1]
 
   mbai@(Z.MutableByteArray mbai#) <- Z.newPinnedByteArray (I.zooOpSize * len)

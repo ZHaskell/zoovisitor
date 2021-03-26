@@ -1,11 +1,11 @@
-{-# LANGUAGE CPP #-}
+{-# LANGUAGE AllowAmbiguousTypes #-}
+{-# LANGUAGE CPP                 #-}
 
 module ZooKeeper.Internal.Types where
 
 import           Control.Exception (bracket_)
 import           Control.Monad     (forM)
 import           Data.Int
-import           Data.Proxy        (Proxy (..))
 import           Foreign
 import           Foreign.C
 import           Numeric           (showHex)
@@ -314,7 +314,7 @@ peekHsWatcherCtx ptr = do
 
 class Completion a where
   {-# MINIMAL csize, peekRet, peekData #-}
-  csize :: Proxy a -> Int
+  csize :: Int
   peekRet :: Ptr a -> IO CInt
   peekData :: Ptr a -> IO a
 
@@ -322,7 +322,7 @@ newtype StringCompletion = StringCompletion { strCompletionValue :: CBytes }
   deriving Show
 
 instance Completion StringCompletion where
-  csize _ = (#size hs_string_completion_t)
+  csize = (#size hs_string_completion_t)
   peekRet ptr = (#peek hs_string_completion_t, rc) ptr
   peekData ptr = do
     value_ptr <- (#peek hs_string_completion_t, value) ptr
@@ -335,7 +335,7 @@ data DataCompletion = DataCompletion
   } deriving (Show, Eq)
 
 instance Completion DataCompletion where
-  csize _ = (#size hs_data_completion_t)
+  csize = (#size hs_data_completion_t)
   peekRet ptr = (#peek hs_data_completion_t, rc) ptr
   peekData ptr = do
     val_ptr <- (#peek hs_data_completion_t, value) ptr
@@ -351,7 +351,7 @@ newtype StatCompletion = StatCompletion { statCompletionStat :: Stat }
   deriving (Show, Eq)
 
 instance Completion StatCompletion where
-  csize _ = (#size hs_stat_completion_t)
+  csize = (#size hs_stat_completion_t)
   peekRet ptr = (#peek hs_stat_completion_t, rc) ptr
   peekData ptr = do
     stat_ptr <- (#peek hs_stat_completion_t, stat) ptr
@@ -361,7 +361,7 @@ instance Completion StatCompletion where
 newtype VoidCompletion = VoidCompletion ()
 
 instance Completion VoidCompletion where
-  csize _ = (#size hs_void_completion_t)
+  csize = (#size hs_void_completion_t)
   peekRet ptr = (#peek hs_stat_completion_t, rc) ptr
   peekData _ = return $ VoidCompletion ()
 
@@ -370,7 +370,7 @@ newtype StringsCompletion = StringsCompletion
   deriving Show
 
 instance Completion StringsCompletion where
-  csize _ = (#size hs_strings_completion_t)
+  csize = (#size hs_strings_completion_t)
   peekRet ptr = (#peek hs_strings_completion_t, rc) ptr
   peekData ptr = do
     strs_ptr <- (#peek hs_strings_completion_t, strings) ptr
@@ -383,7 +383,7 @@ data StringsStatCompletion = StringsStatCompletion
   } deriving Show
 
 instance Completion StringsStatCompletion where
-  csize _ = (#size hs_strings_stat_completion_t)
+  csize = (#size hs_strings_stat_completion_t)
   peekRet ptr = (#peek hs_strings_stat_completion_t, rc) ptr
   peekData ptr = do
     strs_ptr <- (#peek hs_strings_stat_completion_t, strings) ptr

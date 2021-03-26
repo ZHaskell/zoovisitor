@@ -19,6 +19,8 @@ module ZooKeeper.Types
   , I.StringsCompletion (..)
   , I.StringsStatCompletion (..)
 
+  , I.Stat (..)
+
   , I.ZooEvent
   , pattern I.ZooCreateEvent
   , pattern I.ZooDeleteEvent
