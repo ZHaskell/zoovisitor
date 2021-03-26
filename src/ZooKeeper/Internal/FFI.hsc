@@ -202,6 +202,9 @@ foreign import ccall unsafe "hs_zk.h hs_zoo_set_op_init"
 foreign import ccall unsafe "hs_zk.h zoo_check_op_init"
   c_zoo_check_op_init :: Ptr CZooOp -> BA## Word8 -> CInt -> IO ()
 
+foreign import ccall unsafe "hs_zk.h is_unrecoverable"
+  c_is_unrecoverable :: ZHandle -> IO CInt
+
 -------------------------------------------------------------------------------
 -- Helpers
 
