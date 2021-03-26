@@ -30,7 +30,7 @@ zooVersion = makeVersion [ (#const ZOO_MAJOR_VERSION)
                          , (#const ZOO_PATCH_VERSION)
                          ]
 #else
-zooVersion = [0, 0, 0]  -- unsupported
+zooVersion = makeVersion [0, 0, 0]  -- unsupported
 #endif
 
 foreign import ccall unsafe "hs_zk.h &logLevel"
