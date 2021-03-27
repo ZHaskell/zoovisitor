@@ -5,15 +5,17 @@ module ZooKeeper.Internal.FFI where
 
 import           Control.Concurrent
 import           Control.Exception
-import           Control.Monad            (void)
-import           Data.Version             (Version, makeVersion)
+import           Control.Monad                (void)
+import           Data.Version                 (Version, makeVersion,
+                                               parseVersion)
 import           Data.Word
 import           Foreign.C
 import           Foreign.ForeignPtr
 import           Foreign.Ptr
 import           Foreign.StablePtr
 import           GHC.Conc
-import           GHC.Stack                (HasCallStack)
+import           GHC.Stack                    (HasCallStack)
+import           Text.ParserCombinators.ReadP (readP_to_S)
 import           Z.Foreign
 
 import           ZooKeeper.Exception
@@ -30,7 +32,9 @@ zooVersion = makeVersion [ (#const ZOO_MAJOR_VERSION)
                          , (#const ZOO_PATCH_VERSION)
                          ]
 #else
-zooVersion = makeVersion [0, 0, 0]  -- unsupported
+zooVersion = case readP_to_S parseVersion (#const_str ZOO_VERSION) of
+               [_, _, (r, _)] -> r
+               otherwise      -> makeVersion [0, 0, 0]  -- unsupported
 #endif
 
 foreign import ccall unsafe "hs_zk.h &logLevel"
