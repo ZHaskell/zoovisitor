@@ -7,6 +7,8 @@ module ZooKeeper
   , Res.Resource
 
   , zooGetClientID
+  , zooState
+  , zooRecvTimeout
 
   , zooCreate
   , zooSet
@@ -463,6 +465,17 @@ zooWatchGetChildren2 zh path watchfn strsStatfn =
 zooGetClientID :: T.ZHandle -> IO T.ClientID
 zooGetClientID = I.c_zoo_client_id
 
+-- | Get the state of the zookeeper connection
+--
+-- The return valud will be one of the State Consts
+zooState :: T.ZHandle  -> IO CInt
+zooState = I.c_zoo_state
+
+-- | Return the timeout for this session, only valid if the connections
+-- is currently connected (ie. last watcher state is ZOO_CONNECTED_STATE). This
+-- value may change after a server re-connect.
+zooRecvTimeout :: T.ZHandle  -> IO CInt
+zooRecvTimeout = I.c_zoo_recv_timeout
 -------------------------------------------------------------------------------
 
 -- | Atomically commits multiple zookeeper operations.
