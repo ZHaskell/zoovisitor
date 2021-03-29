@@ -469,7 +469,7 @@ zooGetClientID = I.c_zoo_client_id
 --
 -- The return valud will be one of the State Consts
 zooState :: T.ZHandle  -> IO T.ZooState
-zooState = (I.ZooState <$>) . I.c_zoo_state
+zooState = I.c_zoo_state
 
 -- | Return the timeout for this session, only valid if the connections
 -- is currently connected (ie. last watcher state is ZOO_CONNECTED_STATE). This

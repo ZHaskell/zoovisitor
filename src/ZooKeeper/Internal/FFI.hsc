@@ -56,7 +56,7 @@ foreign import ccall unsafe "hs_zk.h zoo_client_id"
   c_zoo_client_id :: ZHandle -> IO ClientID
 
 foreign import ccall unsafe "hs_zk.h zoo_state"
-  c_zoo_state :: ZHandle -> IO CInt
+  c_zoo_state :: ZHandle -> IO ZooState
 
 foreign import ccall unsafe "hs_zk.h zoo_recv_timeout"
   c_zoo_recv_timeout :: ZHandle -> IO CInt
