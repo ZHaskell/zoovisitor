@@ -70,6 +70,14 @@ smoke zh = do
       unStrVec . strsCompletionValues <$> zooGetChildren zh "/y" `shouldReturn` []
       zooDelete zh "/y" Nothing `shouldReturn` ()
 
+  describe "ZooKeeper.zooState" $ do
+    it "test get state" $ do
+      zooState zh `shouldReturn` ZooConnectedState
+
+  describe "ZooKeeper.zooRecvTimeout" $ do
+    it "test receive timeout" $ do
+      zooRecvTimeout zh `shouldReturn` 5000
+
 multiSpec :: ZHandle -> Spec
 multiSpec zh = describe "ZooKeeper.zooMulti" $ do
   it "Test basic multi-op functionality" $ do
