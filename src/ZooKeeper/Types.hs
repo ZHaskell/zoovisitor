@@ -9,6 +9,7 @@ module ZooKeeper.Types
   , I.zooOpenAclUnsafe
   , I.zooReadAclUnsafe
   , I.zooCreatorAllAcl
+  , I.ZooAcl (..)
 
   , I.HsWatcherCtx (..)
 
@@ -18,6 +19,7 @@ module ZooKeeper.Types
   , I.StringCompletion (..)
   , I.StringsCompletion (..)
   , I.StringsStatCompletion (..)
+  , I.AclCompletion (..)
 
   , I.Stat (..)
 
@@ -46,6 +48,15 @@ module ZooKeeper.Types
   , pattern I.ZooLogWarn
   , pattern I.ZooLogInfo
   , pattern I.ZooLogDebug
+
+  , I.ZooPerm
+  , pattern I.ZooPermRead
+  , pattern I.ZooPermWrite
+  , pattern I.ZooPermCreate
+  , pattern I.ZooPermDelete
+  , pattern I.ZooPermAdmin
+  , pattern I.ZooPermAll
+  , I.compactZooPerms
 
   , I.StringVector (..)
   ) where

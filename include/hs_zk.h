@@ -9,6 +9,8 @@
 
 typedef struct Stat stat_t;
 typedef struct String_vector string_vector_t;
+typedef struct ACL acl_t;
+typedef struct ACL_vector acl_vector_t;
 
 const stat_t* dup_stat(const stat_t* old_stat) {
   stat_t* new_stat = (stat_t*)malloc(sizeof(stat_t));
@@ -17,9 +19,13 @@ const stat_t* dup_stat(const stat_t* old_stat) {
 }
 
 const string_vector_t* dup_string_vector(const string_vector_t* old_strings) {
+  int count = old_strings->count;
+  if (count < 0) {
+    fprintf(stderr, "dup_string_vector error: count %d\n", count);
+    return NULL;
+  }
   string_vector_t* new_strings =
       (string_vector_t*)malloc(sizeof(string_vector_t));
-  int count = old_strings->count;
   char** vals = malloc(count * sizeof(char*));
   for (int i = 0; i < count; ++i) {
     vals[i] = strdup(old_strings->data[i]);
@@ -27,6 +33,26 @@ const string_vector_t* dup_string_vector(const string_vector_t* old_strings) {
   new_strings->count = count;
   new_strings->data = vals;
   return new_strings;
+}
+
+const acl_vector_t* dup_acl_vector(const acl_vector_t* old_acls) {
+  int count = old_acls->count;
+  if (count < 0) {
+    fprintf(stderr, "dup_acl_vector error: count %d\n", count);
+    return NULL;
+  }
+  acl_t* data = (acl_t*)malloc(count * sizeof(acl_t));
+  acl_t* old_data = old_acls->data;
+  for (int i = 0; i < count; ++i) {
+    data[i].perms = old_data[i].perms;
+    data[i].id.scheme = strdup(old_data[i].id.scheme);
+    data[i].id.id = strdup(old_data[i].id.id);
+  }
+
+  acl_vector_t* new_acls = (acl_vector_t*)malloc(sizeof(acl_vector_t));
+  new_acls->count = count;
+  new_acls->data = data;
+  return new_acls;
 }
 
 typedef struct hs_watcher_ctx_t {
@@ -82,12 +108,23 @@ typedef struct hs_strings_stat_completion_t {
   const stat_t* stat;
 } hs_strings_stat_completion_t;
 
+typedef struct hs_acl_completion_t {
+  HsStablePtr mvar;
+  HsInt cap;
+  int rc;
+  const struct ACL_vector* acl;
+  const struct Stat* stat;
+} hs_acl_completion_t;
+
 // ----------------------------------------------------------------------------
 
 zhandle_t* hs_zookeeper_init(HsStablePtr mvar, HsInt cap,
                              hs_watcher_ctx_t* watcher_ctx, const char* host,
                              int recv_timeout, const clientid_t* clientid,
                              int flags);
+
+int hs_zoo_aget_acl(zhandle_t* zh, const char* path, HsStablePtr mvar,
+                    HsInt cap, hs_acl_completion_t* completion);
 
 int hs_zoo_acreate(zhandle_t* zh, const char* path, const char* value,
                    HsInt offset, HsInt valuelen, const struct ACL_vector* acl,

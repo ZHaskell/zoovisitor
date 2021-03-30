@@ -44,8 +44,8 @@ pattern ZooLogDebug = ZooLogLevel (#const ZOO_LOG_LEVEL_DEBUG)
 -------------------------------------------------------------------------------
 
 -- | ACL permissions.
-newtype ZooPerm = ZooPerm { unAcl :: CInt }
-  deriving Eq
+newtype ZooPerm = ZooPerm { unZooPerm :: CInt }
+  deriving (Eq, Bits)
 
 instance Show ZooPerm where
   show ZooPermRead   = "ZooPermRead"
@@ -56,25 +56,60 @@ instance Show ZooPerm where
   show ZooPermAll    = "ZooPermAll"
   show (ZooPerm x)   = "ZooPerm: 0x" ++ showHex x ""
 
-pattern ZooPermRead :: ZooPerm
-pattern ZooPermRead = ZooPerm (#const ZOO_PERM_READ)
-
-pattern ZooPermWrite :: ZooPerm
-pattern ZooPermWrite = ZooPerm (#const ZOO_PERM_WRITE)
-
-pattern ZooPermCreate :: ZooPerm
+pattern ZooPermRead, ZooPermWrite, ZooPermCreate, ZooPermDelete, ZooPermAdmin :: ZooPerm
+pattern ZooPermRead   = ZooPerm (#const ZOO_PERM_READ)
+pattern ZooPermWrite  = ZooPerm (#const ZOO_PERM_WRITE)
 pattern ZooPermCreate = ZooPerm (#const ZOO_PERM_CREATE)
-
-pattern ZooPermDelete :: ZooPerm
 pattern ZooPermDelete = ZooPerm (#const ZOO_PERM_DELETE)
-
-pattern ZooPermAdmin :: ZooPerm
-pattern ZooPermAdmin = ZooPerm (#const ZOO_PERM_ADMIN)
+pattern ZooPermAdmin  = ZooPerm (#const ZOO_PERM_ADMIN)
 
 pattern ZooPermAll :: ZooPerm
 pattern ZooPermAll = ZooPerm (#const ZOO_PERM_ALL)
 
-newtype AclVector = AclVector { unAclVector :: Ptr () }
+{-# INLINE toZooPerms #-}
+toZooPerms :: CInt -> [ZooPerm]
+toZooPerms n = go allPerms
+  where
+    go [] = []
+    go (x:xs)
+      | ZooPerm n .&. x == x = x : (go $! xs)
+      | otherwise            = go $! xs
+    allPerms = [ZooPermRead, ZooPermWrite, ZooPermCreate, ZooPermDelete, ZooPermAdmin]
+
+{-# INLINE fromZooPerms #-}
+fromZooPerms :: [ZooPerm] -> CInt
+fromZooPerms = foldr (.|.) 0 . map unZooPerm
+
+{-# INLINE compactZooPerms #-}
+compactZooPerms :: [ZooPerm] -> ZooPerm
+compactZooPerms = ZooPerm . fromZooPerms
+
+data ZooAcl = ZooAcl
+  { aclPerms    :: [ZooPerm]
+  , aclIdScheme :: CBytes
+  , aclId       :: CBytes
+  } deriving Show
+
+{-# INLINE sizeOfZooAcl #-}
+sizeOfZooAcl :: Int
+sizeOfZooAcl = (#size acl_t)
+
+peekZooAcl :: Ptr ZooAcl -> IO ZooAcl
+peekZooAcl ptr = do
+  perms <- toZooPerms <$> (#peek acl_t, perms) ptr
+  scheme_ptr <- (#peek acl_t, id.scheme) ptr
+  id_ptr <- (#peek acl_t, id.id) ptr
+  scheme <- CBytes.fromCString scheme_ptr <* free scheme_ptr
+  acl_id <- CBytes.fromCString id_ptr <* free id_ptr
+  return $ ZooAcl perms scheme acl_id
+
+-- TODO
+unsafeAllocaZooAcl :: ZooAcl -> IO Z.ByteArray
+unsafeAllocaZooAcl = undefined
+
+-- FIXME: consider this
+-- data AclVector = AclVector (Ptr ()) | AclList [ZooAcl]
+newtype AclVector = AclVector (Ptr ())
   deriving (Show, Eq)
 
 -- | This is a completely open ACL
@@ -88,6 +123,18 @@ foreign import ccall unsafe "hs_zk.h &ZOO_READ_ACL_UNSAFE"
 -- | This ACL gives the creators authentication id's all permissions.
 foreign import ccall unsafe "hs_zk.h &ZOO_CREATOR_ALL_ACL"
   zooCreatorAllAcl :: AclVector
+
+toAclList :: AclVector -> IO [ZooAcl]
+toAclList (AclVector ptr) = do
+  count <- fromIntegral @Int32 <$> (#peek acl_vector_t, count) ptr
+  data_ptr <- (#peek acl_vector_t, data) ptr
+  forM [0..count-1] $ \idx -> do
+    let data_ptr' = data_ptr `plusPtr` (idx * sizeOfZooAcl)
+    peekZooAcl data_ptr'
+
+-- TODO
+fromAclList :: [ZooAcl] -> IO AclVector
+fromAclList = undefined
 
 -------------------------------------------------------------------------------
 
@@ -240,17 +287,17 @@ pattern ZooSequence = CreateMode (#const ZOO_SEQUENCE)
 --pattern ZooPersistentSequentialWithTTL = CreateMode (#const ZOO_PERSISTENT_SEQUENTIAL_WITH_TTL)
 
 data Stat = Stat
-  { statCzxid          :: Int64
-  , statMzxid          :: Int64
-  , statCtime          :: Int64
-  , statMtime          :: Int64
-  , statVersion        :: Int32
-  , statCversion       :: Int32
-  , statAversion       :: Int32
-  , statEphemeralOwner :: Int64
-  , statDataLength     :: Int32
-  , statNumChildren    :: Int32
-  , statPzxid          :: Int64
+  { statCzxid          :: {-# UNPACK #-} !Int64
+  , statMzxid          :: {-# UNPACK #-} !Int64
+  , statCtime          :: {-# UNPACK #-} !Int64
+  , statMtime          :: {-# UNPACK #-} !Int64
+  , statVersion        :: {-# UNPACK #-} !Int32
+  , statCversion       :: {-# UNPACK #-} !Int32
+  , statAversion       :: {-# UNPACK #-} !Int32
+  , statEphemeralOwner :: {-# UNPACK #-} !Int64
+  , statDataLength     :: {-# UNPACK #-} !Int32
+  , statNumChildren    :: {-# UNPACK #-} !Int32
+  , statPzxid          :: {-# UNPACK #-} !Int64
   } deriving (Show, Eq)
 
 statSize :: Int
@@ -391,6 +438,20 @@ instance Completion StringsStatCompletion where
     stat_ptr <- (#peek hs_strings_stat_completion_t, stat) ptr
     stat <- peekStat stat_ptr
     return $ StringsStatCompletion vals stat
+
+data AclCompletion = AclCompletion
+  { aclCompletionAcls :: [ZooAcl]
+  , aclCompletionStat :: Stat
+  } deriving Show
+
+instance Completion AclCompletion where
+  csize = (#size hs_acl_completion_t)
+  peekRet ptr = (#peek hs_acl_completion_t, rc) ptr
+  peekData ptr = do
+    acls <- toAclList . AclVector =<< (#peek hs_acl_completion_t, acl) ptr
+    stat_ptr <- (#peek hs_acl_completion_t, stat) ptr
+    stat <- peekStat stat_ptr
+    return $ AclCompletion acls stat
 
 -------------------------------------------------------------------------------
 

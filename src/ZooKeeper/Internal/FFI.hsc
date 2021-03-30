@@ -65,6 +65,12 @@ foreign import ccall unsafe "hs_zk.h zoo_state"
 foreign import ccall unsafe "hs_zk.h zoo_recv_timeout"
   c_zoo_recv_timeout :: ZHandle -> IO CInt
 
+foreign import ccall unsafe "hs_zk.h hs_zoo_aget_acl"
+  c_hs_zoo_aget_acl
+    :: ZHandle -> BA## Word8
+    -> StablePtr PrimMVar -> Int -> Ptr AclCompletion
+    -> IO CInt
+
 foreign import ccall unsafe "hs_zk.h hs_zoo_acreate"
   c_hs_zoo_acreate
     :: ZHandle

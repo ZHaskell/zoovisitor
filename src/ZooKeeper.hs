@@ -6,12 +6,6 @@ module ZooKeeper
   , Res.withResource
   , Res.Resource
 
-  , zooGetClientID
-  , zooState
-  , zooRecvTimeout
-
-  , isUnrecoverable
-
   , zooCreate
   , zooSet
   , zooGet
@@ -23,12 +17,18 @@ module ZooKeeper
   , zooDelete
   , zooExists
   , zooWatchExists
+  , zooGetAcl
 
   , zooMulti
   , zooCreateOpInit
   , zooDeleteOpInit
   , zooSetOpInit
   , zooCheckOpInit
+
+  , zooClientID
+  , zooState
+  , zooRecvTimeout
+  , isUnrecoverable
 
   , zookeeperInit
   , zookeeperClose
@@ -81,16 +81,6 @@ zookeeperResInit
   -> Res.Resource T.ZHandle
 zookeeperResInit host timeout mclientid flags =
   Res.initResource (zookeeperInit host timeout mclientid flags) zookeeperClose
-
--- | Checks if the current zookeeper connection state can't be recovered.
---
--- If True, the application must close the zhandle and then try to reconnect.
-isUnrecoverable
-  :: T.ZHandle
-  -- ^ The zookeeper handle obtained by a call to 'zookeeperResInit'
-  -> IO Bool
-  -- ^ Return True if connection is unrecoverable
-isUnrecoverable zh = (< 0) <$> I.c_is_unrecoverable zh
 
 -- | Create a node.
 --
@@ -472,22 +462,32 @@ zooWatchGetChildren2 zh path watchfn strsStatfn =
           csize I.peekRet I.peekData stringsfn'
           (I.c_hs_zoo_awget_children2 zh path')
 
--- | Return the client session id, only valid if the connections
--- is currently connected (ie. last watcher state is 'T.ZooConnectedState')
-zooGetClientID :: T.ZHandle -> IO T.ClientID
-zooGetClientID = I.c_zoo_client_id
-
--- | Get the state of the zookeeper connection
+-- | Gets the acl associated with a node.
 --
--- The return valud will be one of the State Consts
-zooState :: T.ZHandle  -> IO T.ZooState
-zooState = I.c_zoo_state
+-- Throw one of the following exceptions on failure:
+--
+-- ZBADARGUMENTS - invalid input parameters
+-- ZINVALIDSTATE - zhandle state is either ZOO_SESSION_EXPIRED_STATE or ZOO_AUTH_FAILED_STATE
+-- ZMARSHALLINGERROR - failed to marshall a request; possibly, out of memory
+zooGetAcl
+  :: HasCallStack
+  => T.ZHandle
+  -- ^ The zookeeper handle obtained by a call to 'zookeeperResInit'
+  -> CBytes
+  -- ^ The name of the node. Expressed as a file name with slashes
+  -- separating ancestors of the node.
+  -> IO T.AclCompletion
+  -- ^ The result when the request completes.
+  --
+  -- Throw one of the following exceptions if the request completes failed:
+  --
+  -- * ZNONODE the node does not exist.
+  -- * ZNOAUTH the client does not have permission.
+zooGetAcl zh path = CBytes.withCBytesUnsafe path $ \path' -> do
+  let csize = I.csize @T.AclCompletion
+      cfunc = I.c_hs_zoo_aget_acl zh path'
+   in E.throwZooErrorIfLeft =<< I.withZKAsync csize I.peekRet I.peekData cfunc
 
--- | Return the timeout for this session, only valid if the connections
--- is currently connected (ie. last watcher state is ZOO_CONNECTED_STATE). This
--- value may change after a server re-connect.
-zooRecvTimeout :: T.ZHandle  -> IO CInt
-zooRecvTimeout = I.c_zoo_recv_timeout
 -------------------------------------------------------------------------------
 
 -- | Atomically commits multiple zookeeper operations.
@@ -676,3 +676,30 @@ zookeeperInit host timeout mclientid flags = do
 {-# INLINABLE zookeeperClose #-}
 zookeeperClose :: T.ZHandle -> IO ()
 zookeeperClose = void . E.throwZooErrorIfNotOK <=< I.c_zookeeper_close_safe
+
+-- | Return the client session id, only valid if the connections
+-- is currently connected (ie. last watcher state is 'T.ZooConnectedState')
+zooClientID :: T.ZHandle -> IO T.ClientID
+zooClientID = I.c_zoo_client_id
+
+-- | Checks if the current zookeeper connection state can't be recovered.
+--
+-- If True, the application must close the zhandle and then try to reconnect.
+isUnrecoverable
+  :: T.ZHandle
+  -- ^ The zookeeper handle obtained by a call to 'zookeeperResInit'
+  -> IO Bool
+  -- ^ Return True if connection is unrecoverable
+isUnrecoverable zh = (< 0) <$> I.c_is_unrecoverable zh
+
+-- | Get the state of the zookeeper connection
+--
+-- The return valud will be one of the State Consts
+zooState :: T.ZHandle -> IO T.ZooState
+zooState = I.c_zoo_state
+
+-- | Return the timeout for this session, only valid if the connections
+-- is currently connected (ie. last watcher state is ZOO_CONNECTED_STATE). This
+-- value may change after a server re-connect.
+zooRecvTimeout :: T.ZHandle -> IO CInt
+zooRecvTimeout = I.c_zoo_recv_timeout
