@@ -18,6 +18,7 @@ module ZooKeeper
   , zooExists
   , zooWatchExists
   , zooGetAcl
+  , zooSetAcl
 
   , zooMulti
   , zooCreateOpInit
@@ -487,6 +488,44 @@ zooGetAcl zh path = CBytes.withCBytesUnsafe path $ \path' -> do
   let csize = I.csize @T.AclCompletion
       cfunc = I.c_hs_zoo_aget_acl zh path'
    in E.throwZooErrorIfLeft =<< I.withZKAsync csize I.peekRet I.peekData cfunc
+
+-- | Sets the acl associated with a node.
+--
+-- Throw one of the following exceptions on failure:
+--
+-- ZBADARGUMENTS - invalid input parameters
+-- ZINVALIDSTATE - zhandle state is either ZOO_SESSION_EXPIRED_STATE or ZOO_AUTH_FAILED_STATE
+-- ZMARSHALLINGERROR - failed to marshall a request; possibly, out of memory
+zooSetAcl
+  :: HasCallStack
+  => T.ZHandle
+  -- ^ The zookeeper handle obtained by a call to 'zookeeperResInit'
+  -> CBytes
+  -- ^ The name of the node. Expressed as a file name with slashes
+  -- separating ancestors of the node.
+  -> Maybe T.AclVector
+  -- ^ The acl to be set on the path
+  -> Maybe CInt
+  -- ^ The expected version of the path
+  -> IO T.VoidCompletion
+  -- ^ The result when the request completes
+  --
+  -- Throw one of the following exceptions if the request completes failed:
+  --
+  -- * ZNONODE the node does not exist.
+  -- * ZNOAUTH the client does not have permission.
+  -- * ZINVALIDACL invalid ACL specified
+  -- * ZBADVERSION expected version does not match actual version.
+zooSetAcl zh path m_acl m_version = CBytes.withCBytesUnsafe path $ \path' -> do
+  let csize = I.csize @T.VoidCompletion
+      version = fromMaybe (-1) m_version
+  case m_acl of
+    Just acl -> do
+      let cfunc = I.c_hs_zoo_aset_acl zh path' version acl
+      E.throwZooErrorIfLeft =<< I.withZKAsync csize I.peekRet I.peekData cfunc
+    Nothing -> do
+      let cfunc = I.c_hs_zoo_aset_acl' zh path' version nullPtr
+      E.throwZooErrorIfLeft =<< I.withZKAsync csize I.peekRet I.peekData cfunc
 
 -------------------------------------------------------------------------------
 

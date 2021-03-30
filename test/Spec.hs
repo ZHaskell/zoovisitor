@@ -86,6 +86,13 @@ opSpec zh = do
       compactZooPerms . aclPerms . head . aclCompletionAcls <$> zooGetAcl zh "/acl2"
         `shouldReturn` ZooPermAll
 
+  describe "ZooKeeper.zooSetAcl" $ do
+    it "set acl permission" $ do
+      void $ zooCreate zh "/acl3" Nothing zooOpenAclUnsafe ZooEphemeral
+      void $ zooSetAcl zh "/acl3" (Just zooReadAclUnsafe) Nothing
+      compactZooPerms . aclPerms . head . aclCompletionAcls <$> zooGetAcl zh "/acl3"
+        `shouldReturn` ZooPermRead
+
 propSpec :: ZHandle -> Spec
 propSpec zh = do
   describe "ZooKeeper.zooState" $ do

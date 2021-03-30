@@ -71,6 +71,24 @@ foreign import ccall unsafe "hs_zk.h hs_zoo_aget_acl"
     -> StablePtr PrimMVar -> Int -> Ptr AclCompletion
     -> IO CInt
 
+foreign import ccall unsafe "hs_zk.h hs_zoo_aset_acl"
+  c_hs_zoo_aset_acl
+    :: ZHandle
+    -> BA## Word8
+    -> CInt
+    -> AclVector
+    -> StablePtr PrimMVar -> Int -> Ptr VoidCompletion
+    -> IO CInt
+
+foreign import ccall unsafe "hs_zk.h hs_zoo_aset_acl"
+  c_hs_zoo_aset_acl'
+    :: ZHandle
+    -> BA## Word8
+    -> CInt
+    -> Ptr CChar
+    -> StablePtr PrimMVar -> Int -> Ptr VoidCompletion
+    -> IO CInt
+
 foreign import ccall unsafe "hs_zk.h hs_zoo_acreate"
   c_hs_zoo_acreate
     :: ZHandle

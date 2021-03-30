@@ -126,6 +126,10 @@ zhandle_t* hs_zookeeper_init(HsStablePtr mvar, HsInt cap,
 int hs_zoo_aget_acl(zhandle_t* zh, const char* path, HsStablePtr mvar,
                     HsInt cap, hs_acl_completion_t* completion);
 
+int hs_zoo_aset_acl(zhandle_t* zh, const char* path, int version,
+                    struct ACL_vector* acl, HsStablePtr mvar, HsInt cap,
+                    hs_void_completion_t* completion);
+
 int hs_zoo_acreate(zhandle_t* zh, const char* path, const char* value,
                    HsInt offset, HsInt valuelen, const struct ACL_vector* acl,
                    int mode, HsStablePtr mvar, HsInt cap,
