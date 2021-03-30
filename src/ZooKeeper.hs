@@ -11,7 +11,7 @@ module ZooKeeper
   , zooRecvTimeout
 
   , isUnrecoverable
-  
+
   , zooCreate
   , zooSet
   , zooGet
@@ -83,12 +83,12 @@ zookeeperResInit host timeout mclientid flags =
   Res.initResource (zookeeperInit host timeout mclientid flags) zookeeperClose
 
 -- | Checks if the current zookeeper connection state can't be recovered.
--- 
+--
 -- If True, the application must close the zhandle and then try to reconnect.
-isUnrecoverable 
-  :: T.ZHandle 
+isUnrecoverable
+  :: T.ZHandle
   -- ^ The zookeeper handle obtained by a call to 'zookeeperResInit'
-  -> IO Bool 
+  -> IO Bool
   -- ^ Return True if connection is unrecoverable
 isUnrecoverable zh = (< 0) <$> I.c_is_unrecoverable zh
 
