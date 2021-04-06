@@ -10,6 +10,8 @@ module ZooKeeper.Types
   , I.zooReadAclUnsafe
   , I.zooCreatorAllAcl
   , I.ZooAcl (..)
+  , I.toAclList
+  , I.peekZooAcl
 
   , I.HsWatcherCtx (..)
 

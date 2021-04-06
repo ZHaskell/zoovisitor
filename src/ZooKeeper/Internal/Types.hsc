@@ -88,7 +88,7 @@ data ZooAcl = ZooAcl
   { aclPerms    :: [ZooPerm]
   , aclIdScheme :: CBytes
   , aclId       :: CBytes
-  } deriving Show
+  } deriving (Show, Eq)
 
 {-# INLINE sizeOfZooAcl #-}
 sizeOfZooAcl :: Int
@@ -99,8 +99,11 @@ peekZooAcl ptr = do
   perms <- toZooPerms <$> (#peek acl_t, perms) ptr
   scheme_ptr <- (#peek acl_t, id.scheme) ptr
   id_ptr <- (#peek acl_t, id.id) ptr
-  scheme <- CBytes.fromCString scheme_ptr <* free scheme_ptr
-  acl_id <- CBytes.fromCString id_ptr <* free id_ptr
+  -- scheme <- CBytes.fromCString scheme_ptr <* free scheme_ptr
+  -- acl_id <- CBytes.fromCString id_ptr <* free id_ptr
+  -- we can't do the free for some reason I don't know
+  scheme <- CBytes.fromCString scheme_ptr
+  acl_id <- CBytes.fromCString id_ptr
   return $ ZooAcl perms scheme acl_id
 
 -- TODO
