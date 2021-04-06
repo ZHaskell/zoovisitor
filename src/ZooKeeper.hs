@@ -47,7 +47,7 @@ import           Foreign.C                (CInt)
 import           Foreign.ForeignPtr       (mallocForeignPtrBytes,
                                            touchForeignPtr, withForeignPtr)
 import           Foreign.Ptr              (Ptr, nullPtr, plusPtr)
-import           Foreign                  (Word8, Storable(pokeByteOff, peekByteOff, sizeOf, peek))
+import           Foreign                  (Storable(sizeOf))
 import           GHC.Conc                 (newStablePtrPrimMVar)
 import           GHC.Stack                (HasCallStack, callStack)
 import           Z.Data.CBytes            (CBytes)
@@ -531,40 +531,33 @@ zooSetAcl zh path m_acl m_version = CBytes.withCBytesUnsafe path $ \path' -> do
       E.throwZooErrorIfLeft =<< I.withZKAsync csize I.peekRet I.peekData cfunc
 
 unsafeAllocaZooAcl :: I.ZooAcl -> IO Z.ByteArray
-unsafeAllocaZooAcl (I.ZooAcl perms scheme id) = do
+unsafeAllocaZooAcl (I.ZooAcl acl_perms acl_scheme acl_id) = do
   mba <- Z.newPinnedByteArray I.sizeOfZooAcl
-  mba_scheme@(Z.MutableByteArray mba_scheme#) <- Z.newPinnedByteArray (CBytes.length scheme)
-  mba_id@(Z.MutableByteArray mba_id#) <- Z.newPinnedByteArray (CBytes.length id)
+  mba_scheme@(Z.MutableByteArray mba_scheme#) <- Z.newPinnedByteArray (CBytes.length acl_scheme)
+  mba_id@(Z.MutableByteArray mba_id#) <- Z.newPinnedByteArray (CBytes.length acl_id)
   let ptr_scheme = Z.mutableByteArrayContents mba_scheme
       ptr_id = Z.mutableByteArrayContents mba_id
-      -- ptr = Z.mutableByteArrayContents mba
-  _ <- CBytes.pokeMBACBytes mba_scheme# 0 scheme
-  _ <- CBytes.pokeMBACBytes mba_id# 0 id
-  _ <- Z.writeByteArray mba 0 $ I.fromZooPerms perms
-  _ <- Z.writeByteArray mba 1 ptr_scheme
-  -- equivalently, we could poke the pointer
-  -- _ <- pokeByteOff ptr 8 ptr_scheme
-  -- peek_scheme_ptr <- peekByteOff ptr 8
-  -- peek_scheme <- CBytes.fromCString peek_scheme_ptr
-  -- print peek_scheme
-  _ <- Z.writeByteArray mba 2 ptr_id
+  CBytes.pokeMBACBytes mba_scheme# 0 acl_scheme
+  CBytes.pokeMBACBytes mba_id# 0 acl_id
+  Z.writeByteArray mba 0 $ I.fromZooPerms acl_perms
+  Z.writeByteArray mba 1 ptr_scheme
+  Z.writeByteArray mba 2 ptr_id
   Z.freezeByteArray mba 0 I.sizeOfZooAcl
 
 fromAclList :: [I.ZooAcl] -> IO I.AclVector
 fromAclList acls = do
   let len = length acls
-  mba_data@(Z.MutableByteArray mba_data#) <- Z.newPinnedByteArray (I.sizeOfZooAcl * len)
-  forM_ (zip [0..len-1] acls) $ \(idx, acl) -> do
+  mba_data <- Z.newPinnedByteArray (I.sizeOfZooAcl * len)
+  forM_ (zip [0..] acls) $ \(idx, acl) -> do
     ba_acl <- unsafeAllocaZooAcl acl
-    Z.copyByteArray mba_data (idx * I.sizeOfZooAcl) ba_acl 0 I.sizeOfZooAcl 
-    -- let ptr_acl = Z.byteArrayContents ba_acl
-    -- _ <- Z.writeByteArray mba_data idx ptr_acl
-    return ()
+    Z.copyByteArray mba_data (idx * I.sizeOfZooAcl) ba_acl 0 I.sizeOfZooAcl
   let ptr_data = Z.mutableByteArrayContents mba_data
-  mba@(Z.MutableByteArray mba#) <- Z.newPinnedByteArray (sizeOf len + sizeOf ptr_data)
-  Z.writeByteArray mba 0 len -- should be 8 bytes
-  -- writeByteArray calculates the offset based on the type of the elements to write instead of bytes
-  -- so we rely on the fact that pointers and integers have the same length
+  -- sizeOf len = 8 and sizeOf ptr_data = 8
+  mba <- Z.newPinnedByteArray (sizeOf len + sizeOf ptr_data)
+  Z.writeByteArray mba 0 len
+  -- writeByteArray calculates the offset based on the type of the elements to
+  -- write instead of bytes. So we rely on the fact that pointers and integers
+  -- have the same length
   Z.writeByteArray mba 1 ptr_data
   return . I.AclVector . Z.castPtr . Z.mutableByteArrayContents $ mba
 

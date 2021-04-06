@@ -107,8 +107,8 @@ peekZooAcl ptr = do
   return $ ZooAcl perms scheme acl_id
 
 -- TODO
-unsafeAllocaZooAcl :: ZooAcl -> IO Z.ByteArray
-unsafeAllocaZooAcl = undefined
+-- unsafeAllocaZooAcl :: ZooAcl -> IO Z.ByteArray
+-- unsafeAllocaZooAcl = undefined
 
 -- FIXME: consider this
 -- data AclVector = AclVector (Ptr ()) | AclList [ZooAcl]
@@ -136,8 +136,8 @@ toAclList (AclVector ptr) = do
     peekZooAcl data_ptr'
 
 -- TODO
-fromAclList :: [ZooAcl] -> IO AclVector
-fromAclList = undefined
+-- fromAclList :: [ZooAcl] -> IO AclVector
+-- fromAclList = undefined
 
 -------------------------------------------------------------------------------
 

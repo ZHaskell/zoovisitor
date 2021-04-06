@@ -22,6 +22,17 @@ main = withResource client $ \zh -> do
   hspec $ opSpec zh
   hspec $ multiOpSpec zh
   hspec $ propSpec zh
+  hspec aclSpec
+
+aclSpec :: Spec
+aclSpec = do
+  describe "test acl memory allocation" $
+    it "copy ZooAcl back and forth" $ do
+      let acl1 = ZooAcl [ZooPermRead, ZooPermWrite] "scheme1" "id1"
+          acl2 = ZooAcl [ZooPermCreate, ZooPermDelete] "scheme2" "id2"
+          acls = [acl1, acl2]
+      ptr <- fromAclList acls
+      toAclList ptr `shouldReturn` acls
 
 opSpec :: ZHandle -> Spec
 opSpec zh = do
