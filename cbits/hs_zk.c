@@ -370,6 +370,15 @@ int hs_zoo_aget_acl(zhandle_t* zh, const char* path, HsStablePtr mvar,
   return zoo_aget_acl(zh, path, hs_acl_completion_fn, completion);
 }
 
+int hs_zoo_aset_acl(zhandle_t* zh, const char* path, int version,
+                    struct ACL_vector* acl, HsStablePtr mvar,
+                    HsInt cap, hs_void_completion_t* completion) {
+  completion->mvar = mvar;
+  completion->cap = cap;
+  return zoo_aset_acl(zh, path, version, acl, hs_void_completion_fn,
+                      completion);
+}
+
 int hs_zoo_amulti(zhandle_t* zh, int count, const zoo_op_t* ops,
                   zoo_op_result_t* results, HsStablePtr mvar, HsInt cap,
                   hs_void_completion_t* void_completion) {

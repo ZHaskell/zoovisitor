@@ -18,6 +18,9 @@ module ZooKeeper
   , zooExists
   , zooWatchExists
   , zooGetAcl
+  , zooSetAcl
+  , unsafeAllocaZooAcl
+  , fromAclList
 
   , zooMulti
   , zooCreateOpInit
@@ -37,13 +40,14 @@ module ZooKeeper
 import           Control.Concurrent       (forkIO, myThreadId, newEmptyMVar,
                                            takeMVar, threadCapability)
 import           Control.Exception        (mask_, onException)
-import           Control.Monad            (void, when, zipWithM, (<=<))
+import           Control.Monad            (void, when, zipWithM, (<=<), forM_)
 import           Data.Bifunctor           (first)
 import           Data.Maybe               (fromMaybe)
 import           Foreign.C                (CInt)
 import           Foreign.ForeignPtr       (mallocForeignPtrBytes,
                                            touchForeignPtr, withForeignPtr)
 import           Foreign.Ptr              (Ptr, nullPtr, plusPtr)
+import           Foreign                  (Storable(sizeOf))
 import           GHC.Conc                 (newStablePtrPrimMVar)
 import           GHC.Stack                (HasCallStack, callStack)
 import           Z.Data.CBytes            (CBytes)
@@ -488,6 +492,75 @@ zooGetAcl zh path = CBytes.withCBytesUnsafe path $ \path' -> do
       cfunc = I.c_hs_zoo_aget_acl zh path'
    in E.throwZooErrorIfLeft =<< I.withZKAsync csize I.peekRet I.peekData cfunc
 
+-- | Sets the acl associated with a node.
+--
+-- Throw one of the following exceptions on failure:
+--
+-- ZBADARGUMENTS - invalid input parameters
+-- ZINVALIDSTATE - zhandle state is either ZOO_SESSION_EXPIRED_STATE or ZOO_AUTH_FAILED_STATE
+-- ZMARSHALLINGERROR - failed to marshall a request; possibly, out of memory
+zooSetAcl
+  :: HasCallStack
+  => T.ZHandle
+  -- ^ The zookeeper handle obtained by a call to 'zookeeperResInit'
+  -> CBytes
+  -- ^ The name of the node. Expressed as a file name with slashes
+  -- separating ancestors of the node.
+  -> Maybe T.AclVector
+  -- ^ The acl to be set on the path
+  -> Maybe CInt
+  -- ^ The expected version of the path
+  -> IO T.VoidCompletion
+  -- ^ The result when the request completes
+  --
+  -- Throw one of the following exceptions if the request completes failed:
+  --
+  -- * ZNONODE the node does not exist.
+  -- * ZNOAUTH the client does not have permission.
+  -- * ZINVALIDACL invalid ACL specified
+  -- * ZBADVERSION expected version does not match actual version.
+zooSetAcl zh path m_acl m_version = CBytes.withCBytesUnsafe path $ \path' -> do
+  let csize = I.csize @T.VoidCompletion
+      version = fromMaybe (-1) m_version
+  case m_acl of
+    Just acl -> do
+      let cfunc = I.c_hs_zoo_aset_acl zh path' version acl
+      E.throwZooErrorIfLeft =<< I.withZKAsync csize I.peekRet I.peekData cfunc
+    Nothing -> do
+      let cfunc = I.c_hs_zoo_aset_acl' zh path' version nullPtr
+      E.throwZooErrorIfLeft =<< I.withZKAsync csize I.peekRet I.peekData cfunc
+
+unsafeAllocaZooAcl :: I.ZooAcl -> IO Z.ByteArray
+unsafeAllocaZooAcl (I.ZooAcl acl_perms acl_scheme acl_id) = do
+  mba <- Z.newPinnedByteArray I.sizeOfZooAcl
+  mba_scheme@(Z.MutableByteArray mba_scheme#) <- Z.newPinnedByteArray (CBytes.length acl_scheme)
+  mba_id@(Z.MutableByteArray mba_id#) <- Z.newPinnedByteArray (CBytes.length acl_id)
+  let ptr_scheme = Z.mutableByteArrayContents mba_scheme
+      ptr_id = Z.mutableByteArrayContents mba_id
+  CBytes.pokeMBACBytes mba_scheme# 0 acl_scheme
+  CBytes.pokeMBACBytes mba_id# 0 acl_id
+  Z.writeByteArray mba 0 $ I.fromZooPerms acl_perms
+  Z.writeByteArray mba 1 ptr_scheme
+  Z.writeByteArray mba 2 ptr_id
+  Z.freezeByteArray mba 0 I.sizeOfZooAcl
+
+fromAclList :: [I.ZooAcl] -> IO I.AclVector
+fromAclList acls = do
+  let len = length acls
+  mba_data <- Z.newPinnedByteArray (I.sizeOfZooAcl * len)
+  forM_ (zip [0..] acls) $ \(idx, acl) -> do
+    ba_acl <- unsafeAllocaZooAcl acl
+    Z.copyByteArray mba_data (idx * I.sizeOfZooAcl) ba_acl 0 I.sizeOfZooAcl
+  let ptr_data = Z.mutableByteArrayContents mba_data
+  -- sizeOf len = 8 and sizeOf ptr_data = 8
+  mba <- Z.newPinnedByteArray (sizeOf len + sizeOf ptr_data)
+  Z.writeByteArray mba 0 len
+  -- writeByteArray calculates the offset based on the type of the elements to
+  -- write instead of bytes. So we rely on the fact that pointers and integers
+  -- have the same length
+  Z.writeByteArray mba 1 ptr_data
+  return . I.AclVector . Z.castPtr . Z.mutableByteArrayContents $ mba
+
 -------------------------------------------------------------------------------
 
 -- | Atomically commits multiple zookeeper operations.
@@ -499,7 +572,7 @@ zooMulti
   => T.ZHandle
   -- ^ The zookeeper handle obtained by a call to 'zookeeperResInit'
   -> [T.ZooOp]
-  -- ^ An list of operations to commit
+  -- ^ A list of operations to commit
   -> IO [T.ZooOpResult]
 zooMulti zh ops = do
   let len = length ops
