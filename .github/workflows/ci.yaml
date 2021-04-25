@@ -51,6 +51,10 @@ jobs:
           cat /usr/local/etc/zookeeper/zoo.cfg
           zkServer start
 
+      - name: remove xcode devtools on osx
+        if: runner.os == 'macOS'
+        run: sudo rm -rf /Library/Developer/CommandLineTools/SDKs
+
       - name: Setup Haskell
         uses: haskell/actions/setup@v1
         with:

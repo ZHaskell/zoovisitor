@@ -36,11 +36,11 @@ jobs:
         run: |
           cabal sdist && cabal haddock --enable-documentation --haddock-for-hackage
 
-          tar_file=$(cabal sdist | grep zoovisitor)
-          doc_file=$(cabal haddock --enable-documentation --haddock-for-hackage|grep 'zoovisitor.*docs.tar.gz')
+          tar_file="$(cabal sdist | grep zoovisitor)"
+          doc_file="$(cabal haddock --enable-documentation --haddock-for-hackage|grep 'zoovisitor.*docs.tar.gz')"
 
           echo $tar_file
           echo $doc_file
 
-          cabal upload -u "${{ secrets.HACKAGE_USERNAME }}" -p "${{ secrets.HACKAGE_PASSWORD }}" --publish $tar_file
-          cabal upload -u "${{ secrets.HACKAGE_USERNAME }}" -p "${{ secrets.HACKAGE_PASSWORD }}" --publush --doc $doc_file
+          cabal upload -u '${{ secrets.HACKAGE_USERNAME }}' -p '${{ secrets.HACKAGE_PASSWORD }}' --publish $tar_file
+          cabal upload -u '${{ secrets.HACKAGE_USERNAME }}' -p '${{ secrets.HACKAGE_PASSWORD }}' --publush --doc $doc_file
