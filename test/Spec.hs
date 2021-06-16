@@ -43,7 +43,7 @@ opSpec zh = do
       dataCompletionValue <$> zooGet zh "/a" `shouldReturn` Nothing
 
   describe "ZooKeeper.zooWatchExists" $ do
-    it "wathch for node to appear" $ do
+    it "watch for node to appear" $ do
       ctx <- newEmptyMVar
       ret <- newEmptyMVar
       _ <- forkIO $ zooWatchExists zh "/b" (ctx `putMVar`) (ret `putMVar`)
@@ -53,6 +53,17 @@ opSpec zh = do
       watcherCtxType ctx' `shouldBe` ZooCreateEvent
       watcherCtxState ctx' `shouldBe` ZooConnectedState
       watcherCtxPath ctx' `shouldBe` Just "/b"
+
+  describe "ZooKeeper.zooDeleteAll" $ do
+    it "test recursively delete" $ do
+      void $ zooCreate zh "/x" Nothing zooOpenAclUnsafe ZooPersistent
+      void $ zooCreate zh "/x/1" Nothing zooOpenAclUnsafe ZooPersistent
+      void $ zooCreate zh "/x/2" Nothing zooOpenAclUnsafe ZooPersistent
+      void $ zooCreate zh "/x/2/1" Nothing zooOpenAclUnsafe ZooPersistent
+      unStrVec . strsCompletionValues <$> zooGetChildren zh "/x" `shouldReturn` ["1", "2"]
+      zooDeleteAll zh "/x" `shouldReturn` ()
+      void $ zooCreate zh "/x" Nothing zooOpenAclUnsafe ZooPersistent
+      zooDeleteAll zh "/x" `shouldReturn` ()
 
   describe "ZooKeeper.zooGetChildren" $ do
     it "test get children" $ do
