@@ -259,10 +259,7 @@ zooDelete zh path m_version = CBytes.withCBytesUnsafe path $ \path' ->
 -- | Delete a node and all its children in zookeeper.
 --
 -- If fail will throw exceptions, check `zooDeleteAll` and `zooGetChildren` for more details
-zooDeleteAll :: HasCallStack
-           => T.ZHandle
-           -> CBytes
-           -> IO ()
+zooDeleteAll :: HasCallStack => T.ZHandle -> CBytes -> IO ()
 zooDeleteAll zh path = do
   T.StringsCompletion (T.StringVector children) <- zooGetChildren zh path
   mapM_ (zooDeleteAll zh <=< ZF.join path) children
