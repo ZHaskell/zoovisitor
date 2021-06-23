@@ -15,6 +15,7 @@ module ZooKeeper
   , zooGetChildren2
   , zooWatchGetChildren2
   , zooDelete
+  , zooDeleteAll
   , zooExists
   , zooWatchExists
   , zooGetAcl
@@ -51,6 +52,7 @@ import qualified Z.Data.CBytes            as CBytes
 import qualified Z.Data.Text.Print        as Text
 import           Z.Data.Vector            (Bytes)
 import qualified Z.Foreign                as Z
+import qualified Z.IO.FileSystem.FilePath as ZF
 import qualified Z.IO.Resource            as Res
 
 import qualified ZooKeeper.Exception      as E
@@ -253,6 +255,15 @@ zooDelete zh path m_version = CBytes.withCBytesUnsafe path $ \path' ->
       cfunc = I.c_hs_zoo_adelete zh path' version
       version = fromMaybe (-1) m_version
    in void $ E.throwZooErrorIfLeft =<< I.withZKAsync csize I.peekRet I.peekData cfunc
+
+-- | Delete a node and all its children in zookeeper.
+--
+-- If fail will throw exceptions, check `zooDeleteAll` and `zooGetChildren` for more details
+zooDeleteAll :: HasCallStack => T.ZHandle -> CBytes -> IO ()
+zooDeleteAll zh path = do
+  T.StringsCompletion (T.StringVector children) <- zooGetChildren zh path
+  mapM_ (zooDeleteAll zh <=< ZF.join path) children
+  zooDelete zh path Nothing
 
 -- | Checks the existence of a node in zookeeper.
 --
