@@ -43,4 +43,4 @@ jobs:
           echo $doc_file
 
           cabal upload -u '${{ secrets.HACKAGE_USERNAME }}' -p '${{ secrets.HACKAGE_PASSWORD }}' --publish $tar_file
-          cabal upload -u '${{ secrets.HACKAGE_USERNAME }}' -p '${{ secrets.HACKAGE_PASSWORD }}' --publush --doc $doc_file
+          cabal upload -u '${{ secrets.HACKAGE_USERNAME }}' -p '${{ secrets.HACKAGE_PASSWORD }}' --publish --doc $doc_file
