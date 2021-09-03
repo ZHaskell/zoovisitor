@@ -42,6 +42,11 @@ module ZooKeeper.Types
   , pattern I.ZooPersistent
   , pattern I.ZooEphemeral
   , pattern I.ZooSequence
+  , pattern I.ZooPersistentSequential
+  , pattern I.ZooEphemeralSequential
+  , pattern I.ZooContainer
+  , pattern I.ZooPersistentWithTTL
+  , pattern I.ZooPersistentSequentialWithTTL
 
   , I.ZooLogLevel
   , pattern I.ZooLogError
