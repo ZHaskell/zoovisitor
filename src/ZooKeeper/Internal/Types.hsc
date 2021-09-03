@@ -257,17 +257,13 @@ pattern ZooNoWatchingEvent = ZooEvent (#const ZOO_NOTWATCHING_EVENT)
 newtype CreateMode = CreateMode { unCreateMode :: CInt }
   deriving (Show, Eq, Storable)
 
-pattern ZooPersistent :: CreateMode
-pattern ZooPersistent = CreateMode 0
+-- TODO: The following C constants (such as ZOO_PERSISTENT, ZOO_PERSISTENT_SEQUENTIAL
+--       and ZOO_EPTHMERAL_SEQUENTIAL) are not defined on clients <= 3.4.x. However,
+--       they can be used by passing an integer directly.
+--
+--       The hard-coded ones will be replaced with the following patterns which use
+--       C constants when the library only support clients >= 3.5.x.
 
--- | The znode will be deleted upon the client's disconnect.
-pattern ZooEphemeral :: CreateMode
-pattern ZooEphemeral = CreateMode (#const ZOO_EPHEMERAL)
-
-pattern ZooSequence :: CreateMode
-pattern ZooSequence = CreateMode (#const ZOO_SEQUENCE)
-
--- TODO
 --pattern ZooPersistent :: CreateMode
 --pattern ZooPersistent = CreateMode (#const ZOO_PERSISTENT)
 --
@@ -285,6 +281,31 @@ pattern ZooSequence = CreateMode (#const ZOO_SEQUENCE)
 --
 --pattern ZooPersistentSequentialWithTTL :: CreateMode
 --pattern ZooPersistentSequentialWithTTL = CreateMode (#const ZOO_PERSISTENT_SEQUENTIAL_WITH_TTL)
+
+pattern ZooPersistent :: CreateMode
+pattern ZooPersistent = CreateMode 0
+
+pattern ZooPersistentSequential :: CreateMode
+pattern ZooPersistentSequential = CreateMode 2
+
+pattern ZooEphemeralSequential :: CreateMode
+pattern ZooEphemeralSequential = CreateMode 3
+
+pattern ZooContainer :: CreateMode
+pattern ZooContainer = CreateMode 4
+
+pattern ZooPersistentWithTTL :: CreateMode
+pattern ZooPersistentWithTTL = CreateMode 5
+
+pattern ZooPersistentSequentialWithTTL :: CreateMode
+pattern ZooPersistentSequentialWithTTL = CreateMode 6
+
+-- | The znode will be deleted upon the client's disconnect.
+pattern ZooEphemeral :: CreateMode
+pattern ZooEphemeral = CreateMode (#const ZOO_EPHEMERAL)
+
+pattern ZooSequence :: CreateMode
+pattern ZooSequence = CreateMode (#const ZOO_SEQUENCE)
 
 data Stat = Stat
   { statCzxid          :: {-# UNPACK #-} !Int64
