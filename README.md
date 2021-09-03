@@ -1,6 +1,8 @@
 ZooVisitor
 ==========
 
+[![Hackage](https://img.shields.io/hackage/v/zoovisitor.svg?style=flat)](https://hackage.haskell.org/package/zoovisitor)
+
 An Apache [zookeeper](https://zookeeper.apache.org/) client for Haskell.
 
 Tested on zookeeper 3.4, a higher version should work but not guaranteed.
