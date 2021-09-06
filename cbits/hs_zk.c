@@ -12,7 +12,6 @@ void hs_zookeeper_watcher_fn(zhandle_t* zh, int type, int state,
   watcher_ctx->state = state;
   watcher_ctx->path = strdup(path);
   hs_try_putmvar(watcher_ctx->cap, watcher_ctx->mvar);
-  hs_thread_done();
 }
 
 /**
@@ -40,7 +39,6 @@ void hs_string_completion_fn(int rc, const char* value, const void* data) {
     string_completion->value = strdup(value);
   }
   hs_try_putmvar(string_completion->cap, string_completion->mvar);
-  hs_thread_done();
 }
 
 /**
@@ -79,7 +77,6 @@ void hs_data_completion_fn(int rc, const char* value, int value_len,
     data_completion->stat = dup_stat(stat);
   }
   hs_try_putmvar(data_completion->cap, data_completion->mvar);
-  hs_thread_done();
 }
 
 /**
@@ -109,7 +106,6 @@ void hs_stat_completion_fn(int rc, const struct Stat* stat, const void* data) {
     stat_completion->stat = dup_stat(stat);
   }
   hs_try_putmvar(stat_completion->cap, stat_completion->mvar);
-  hs_thread_done();
 }
 
 /**
@@ -133,7 +129,6 @@ void hs_void_completion_fn(int rc, const void* data) {
   hs_void_completion_t* void_completion = (hs_void_completion_t*)data;
   void_completion->rc = rc;
   hs_try_putmvar(void_completion->cap, void_completion->mvar);
-  hs_thread_done();
 }
 
 /**
@@ -165,7 +160,6 @@ void hs_strings_completion_fn(int rc, const string_vector_t* strings,
     strings_completion->strings = dup_string_vector(strings);
   }
   hs_try_putmvar(strings_completion->cap, strings_completion->mvar);
-  hs_thread_done();
 }
 
 /**
@@ -204,7 +198,6 @@ void hs_strings_stat_completion_fn(int rc, const string_vector_t* strings,
     strings_stat->stat = dup_stat(stat);
   }
   hs_try_putmvar(strings_stat->cap, strings_stat->mvar);
-  hs_thread_done();
 }
 
 /**
@@ -239,7 +232,6 @@ void hs_acl_completion_fn(int rc, struct ACL_vector* acl, struct Stat* stat,
     acl_completion->stat = dup_stat(stat);
   }
   hs_try_putmvar(acl_completion->cap, acl_completion->mvar);
-  hs_thread_done();
 }
 
 // ----------------------------------------------------------------------------
