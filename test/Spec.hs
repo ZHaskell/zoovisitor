@@ -3,12 +3,17 @@
 module Main where
 
 import           Control.Concurrent
-import           Control.Monad       (void)
-import           Data.Version        (makeVersion)
+import           Control.Monad             (replicateM, void)
+import qualified Data.UUID                 as UUID
+import           Data.UUID.V4
+import           Data.Version              (makeVersion)
 import           Foreign.C
 import           Test.Hspec
+import qualified Z.Data.CBytes             as CB
+
 import           ZooKeeper
 import           ZooKeeper.Exception
+import           ZooKeeper.Recipe.Election (election)
 import           ZooKeeper.Types
 
 recvTimeout :: CInt
@@ -22,6 +27,8 @@ main = withResource client $ \zh -> do
   hspec $ opSpec zh
   hspec $ multiOpSpec zh
   hspec $ propSpec zh
+  hspec $ electionSpec1 zh
+  hspec $ electionSpec2 client
 
 opSpec :: ZHandle -> Spec
 opSpec zh = do
@@ -127,6 +134,46 @@ multiOpSpec zh = describe "ZooKeeper.zooMulti" $ do
     head results' `shouldBe` ZooDeleteOpResult CZOK
     results' !! 1 `shouldBe` ZooDeleteOpResult CZOK
     zooExists zh "/multi" `shouldReturn` Nothing
+
+electionSpec1 :: ZHandle -> Spec
+electionSpec1 zh = describe "ZooKeeper.zooElection (single session)" $ do
+  it "Test single node situation" $ do
+    leader <- newEmptyMVar
+    uuid <- nextRandom
+    _ <- forkIO $ election zh "/election1" (CB.pack . UUID.toString $ uuid)
+      (putMVar leader 1) (\_ -> return ())
+    readMVar leader `shouldReturn` (1 :: Int)
+
+electionSpec2 :: Resource ZHandle -> Spec
+electionSpec2 client_ = describe "ZooKeeper.zooElection (multi sessions)" $ do
+  it "Test multi node situation" $ do
+    leader <- newMVar 0
+    [finished1, finished2, finished3, finished4] <- replicateM 4 newEmptyMVar
+    [uuid1, uuid2, uuid3] <- replicateM 3 nextRandom
+
+    t1 <- forkIO $ withResource client_ $ \zh1 -> do
+      t <- election zh1 "/election2" (CB.pack . UUID.toString $ uuid1)
+        (do {void $ swapMVar leader 1; putMVar finished1 ()})
+        (\_ -> putMVar finished1 ())
+      threadDelay (maxBound :: Int)
+      return t
+    void $ takeMVar finished1
+
+    _ <- forkIO $ withResource client_ $ \zh2 -> do
+      election zh2 "/election2" (CB.pack . UUID.toString $ uuid2)
+        (do {void $ swapMVar leader 2; putMVar finished4 ()})
+        (\_ -> putMVar finished2 ())
+    void $ takeMVar finished2
+
+    _ <- forkIO $ withResource client_ $ \zh3 -> do
+      election zh3 "/election2" (CB.pack . UUID.toString $ uuid3)
+        (void $ swapMVar leader 3)
+        (\_ -> putMVar finished3 ())
+    void $ takeMVar finished3
+
+    killThread t1
+    takeMVar finished4
+    readMVar leader `shouldReturn` (2 :: Int)
 
 -------------------------------------------------------------------------------
 

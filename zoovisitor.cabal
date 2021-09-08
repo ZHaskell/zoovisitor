@@ -33,10 +33,12 @@ library
     ZooKeeper
     ZooKeeper.Exception
     ZooKeeper.Types
+    ZooKeeper.Recipe.Election
 
   other-modules:
     ZooKeeper.Internal.FFI
     ZooKeeper.Internal.Types
+    ZooKeeper.Recipe.Utils
 
   build-depends:
     , base    >=4.12  && <5
@@ -80,7 +82,10 @@ test-suite zoovisitor-test
   build-depends:
     , base        >=4.12 && <5
     , hspec
+    , uuid
+    , Z-Data
     , zoovisitor
+
 
   default-language: Haskell2010
   ghc-options:
