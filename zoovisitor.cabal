@@ -33,6 +33,7 @@ library
     ZooKeeper
     ZooKeeper.Exception
     ZooKeeper.Recipe.Election
+    ZooKeeper.Recipe.Lock
     ZooKeeper.Types
 
   other-modules:
@@ -80,6 +81,7 @@ test-suite zoovisitor-test
   main-is:          Spec.hs
   hs-source-dirs:   test
   build-depends:
+    , async
     , base        >=4.12 && <5
     , hspec
     , uuid
