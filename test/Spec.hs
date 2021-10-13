@@ -4,18 +4,17 @@ module Main where
 
 import           Control.Concurrent
 import           Control.Concurrent.Async (concurrently_)
-import           Control.Monad             (replicateM, void)
-import qualified Data.UUID                 as UUID
+import           Control.Monad            (replicateM, void)
+import qualified Data.UUID                as UUID
 import           Data.UUID.V4
-import           Data.Version              (makeVersion)
+import           Data.Version             (makeVersion)
 import           Foreign.C
 import           Test.Hspec
-import qualified Z.Data.CBytes             as CB
+import qualified Z.Data.CBytes            as CB
 
 import           ZooKeeper
 import           ZooKeeper.Exception
-import           ZooKeeper.Recipe.Election (election)
-import           ZooKeeper.Recipe.Lock (lock, unlock)
+import           ZooKeeper.Recipe         (election, lock, unlock)
 import           ZooKeeper.Types
 
 recvTimeout :: CInt
