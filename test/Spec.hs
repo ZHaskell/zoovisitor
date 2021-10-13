@@ -3,6 +3,7 @@
 module Main where
 
 import           Control.Concurrent
+import           Control.Concurrent.Async (concurrently_)
 import           Control.Monad             (replicateM, void)
 import qualified Data.UUID                 as UUID
 import           Data.UUID.V4
@@ -14,6 +15,7 @@ import qualified Z.Data.CBytes             as CB
 import           ZooKeeper
 import           ZooKeeper.Exception
 import           ZooKeeper.Recipe.Election (election)
+import           ZooKeeper.Recipe.Lock (lock, unlock)
 import           ZooKeeper.Types
 
 recvTimeout :: CInt
@@ -29,6 +31,8 @@ main = withResource client $ \zh -> do
   hspec $ propSpec zh
   hspec $ electionSpec1 zh
   hspec $ electionSpec2 client
+  hspec $ lockSpec1 zh
+  hspec $ lockSpec2 client
 
 opSpec :: ZHandle -> Spec
 opSpec zh = do
@@ -174,6 +178,43 @@ electionSpec2 client_ = describe "ZooKeeper.zooElection (multi sessions)" $ do
     killThread t1
     takeMVar finished4
     readMVar leader `shouldReturn` (2 :: Int)
+
+lockSpec1 :: ZHandle -> Spec
+lockSpec1 zh = describe "ZooKeeper.zooLock (single session)" $ do
+  it "Test single client situation" $ do
+    result <- newEmptyMVar
+    uuid <- nextRandom
+    thisLock <- lock zh "/lock1" (CB.pack . UUID.toString $ uuid)
+    putMVar result 1
+    unlock zh thisLock
+    readMVar result `shouldReturn` (1 :: Int)
+
+lockSpec2 :: Resource ZHandle -> Spec
+lockSpec2 client_ = describe "ZooKeeper.zooLock (multi sessions)" $ do
+  it "Test multi clients situation" $ do
+    result1 <- newMVar 0
+    result2 <- newMVar 0
+    [uuid1, uuid2] <- replicateM 2 nextRandom
+
+    concurrently_ (action1 result1) (action1 result1)
+    readMVar result1 `shouldReturn` (1 :: Int)
+
+    withResource client_ $ \zh1 -> do
+      withResource client_ $ \zh2 -> do
+        concurrently_ (action2 zh1 (CB.pack . UUID.toString $ uuid1) result2)
+                      (action2 zh2 (CB.pack . UUID.toString $ uuid2) result2)
+        readMVar result2 `shouldReturn` (2 :: Int)
+  where
+    action1 target = do
+      x <- readMVar target
+      threadDelay 100000
+      swapMVar target (x + 1)
+    action2 zh guid target = do
+      thisLock <- lock zh "/lock2" guid
+      x <- readMVar target
+      threadDelay 100000
+      _ <- swapMVar target (x + 1)
+      unlock zh thisLock
 
 -------------------------------------------------------------------------------
 
