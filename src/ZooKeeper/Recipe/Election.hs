@@ -1,4 +1,6 @@
-module ZooKeeper.Recipe.Election where
+module ZooKeeper.Recipe.Election
+  ( election
+  ) where
 
 import           Control.Monad
 import qualified Z.Data.Builder         as B
