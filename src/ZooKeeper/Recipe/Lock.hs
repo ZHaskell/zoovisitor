@@ -3,12 +3,12 @@ module ZooKeeper.Recipe.Lock
   , unlock
   ) where
 
-import           Control.Exception
+import           Control.Exception      (catch, try)
 import           Control.Monad
 import           Z.Data.CBytes          (CBytes)
 
 import           ZooKeeper
-import           ZooKeeper.Exception
+import           ZooKeeper.Exception    (ZNODEEXISTS, ZooException)
 import           ZooKeeper.Recipe.Utils (SequenceNumWithGUID (..),
                                          createSeqEphemeralZNode,
                                          mkSequenceNumWithGUID)
@@ -27,10 +27,11 @@ lock :: ZHandle
      -- the same lock
 lock zk lockPath guid = do
   -- Check persistent paths
-  electionExists <- zooExists zk lockPath
-  case electionExists of
-    Just _  -> return ()
-    Nothing -> void (try $ zooCreate zk lockPath Nothing zooOpenAclUnsafe ZooPersistent :: IO (Either ZooException StringCompletion))
+  do electionExists <- zooExists zk lockPath
+     case electionExists of
+       Just _  -> return ()
+       Nothing -> void (try $ zooCreate zk lockPath Nothing zooOpenAclUnsafe ZooPersistent :: IO (Either ZooException StringCompletion))
+     `catch` (\(_ :: ZNODEEXISTS) -> return ())
 
   -- Create Ephemeral and Sequece znode, and get the seq number i
   (StringCompletion this) <- createSeqEphemeralZNode zk lockPath guid
