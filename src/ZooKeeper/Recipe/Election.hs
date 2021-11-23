@@ -2,12 +2,14 @@ module ZooKeeper.Recipe.Election
   ( election
   ) where
 
+import           Control.Exception      (catch)
 import           Control.Monad
 import qualified Z.Data.Builder         as B
 import           Z.Data.CBytes          (CBytes)
 import qualified Z.IO.Logger            as Log
 
 import           ZooKeeper
+import           ZooKeeper.Exception    (ZNODEEXISTS)
 import           ZooKeeper.Recipe.Utils (SequenceNumWithGUID (..),
                                          createSeqEphemeralZNode,
                                          mkSequenceNumWithGUID)
@@ -35,10 +37,11 @@ election zk electionPath guid leaderApp watchSetApp = Log.withDefaultLogger $ do
   let electionSeqPath = electionPath <> "/" <> guid <> "_"
 
   -- Check persistent paths
-  electionExists <- zooExists zk electionPath
-  case electionExists of
-    Just _  -> return ()
-    Nothing -> void $ zooCreate zk electionPath Nothing zooOpenAclUnsafe ZooPersistent
+  do electionExists <- zooExists zk electionPath
+     case electionExists of
+       Just _  -> return ()
+       Nothing -> void $ zooCreate zk electionPath Nothing zooOpenAclUnsafe ZooPersistent
+     `catch` (\(_ :: ZNODEEXISTS) -> return ())
 
   -- Create Ephemeral and Sequece znode, and get the seq number i
   (StringCompletion this) <- createSeqEphemeralZNode zk electionPath guid
