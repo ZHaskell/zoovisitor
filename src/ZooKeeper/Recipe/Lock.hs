@@ -1,9 +1,13 @@
 module ZooKeeper.Recipe.Lock
-  ( lock
+  ( withLock
+
+    -- * Internal
+    -- Use them seperately is not safe!
+  , lock
   , unlock
   ) where
 
-import           Control.Exception      (catch, try)
+import           Control.Exception      (bracket, catch, try)
 import           Control.Monad
 import           Z.Data.CBytes          (CBytes)
 
@@ -15,6 +19,7 @@ import           ZooKeeper.Recipe.Utils (SequenceNumWithGUID (..),
 import           ZooKeeper.Types
 
 -- | To acquire a distributed lock.
+-- Warning: do not forget to unlock it! Use 'withLock' instead if possible.
 lock :: ZHandle
      -- ^ The zookeeper handle obtained by a call to 'zookeeperResInit'
      -> CBytes
@@ -61,3 +66,20 @@ unlock :: ZHandle
        -- thrown if it is bad (for example, does not exist)
        -> IO ()
 unlock zk thisLock = zooDelete zk thisLock Nothing
+
+-- | To do an action with a distributed lock. Only one caller with the same
+-- 'lockPath' can execute the action at the same time. If the action throws
+-- any exception during the locking period, the lock will be released and the
+-- exception will be thrown again.
+withLock :: ZHandle
+         -- ^ The zookeeper handle obtained by a call to 'zookeeperResInit'
+         -> CBytes
+         -- ^ The path to get the lock. Ephemeral znodes will be put on it.
+         -> CBytes
+         -- ^ The GUID for this zookeeper session. To handle recoverable execptions
+         -- correctly, it should be distinct from different sessions.
+         -> IO a
+         -- ^ The action to be executed within the lock.
+         -> IO a
+withLock zk lockPath guid action =
+  bracket (lock zk lockPath guid) (unlock zk) (const action)
