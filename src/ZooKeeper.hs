@@ -3,6 +3,7 @@ module ZooKeeper
   , I.zooSetDebugLevel
 
   , zookeeperResInit
+  , zookeeperResInitWithWatcher
   , Res.withResource
   , Res.Resource
 
@@ -31,7 +32,9 @@ module ZooKeeper
   , zooRecvTimeout
   , isUnrecoverable
 
+    -- * Internal function (should NOT be used)
   , zookeeperInit
+  , zookeeperInitWithWatcher
   , zookeeperClose
   ) where
 
@@ -44,7 +47,8 @@ import           Data.Maybe               (fromMaybe)
 import           Foreign.C                (CInt)
 import           Foreign.ForeignPtr       (mallocForeignPtrBytes,
                                            touchForeignPtr, withForeignPtr)
-import           Foreign.Ptr              (Ptr, nullPtr, plusPtr)
+import           Foreign.Ptr              (FunPtr, Ptr, freeHaskellFunPtr,
+                                           nullPtr, plusPtr)
 import           GHC.Conc                 (newStablePtrPrimMVar)
 import           GHC.Stack                (HasCallStack, callStack)
 import           Z.Data.CBytes            (CBytes)
@@ -83,6 +87,30 @@ zookeeperResInit
   -> Res.Resource T.ZHandle
 zookeeperResInit host timeout mclientid flags =
   Res.initResource (zookeeperInit host timeout mclientid flags) zookeeperClose
+
+zookeeperResInitWithWatcher
+  :: CBytes
+  -- ^ host, comma separated host:port pairs, each corresponding to a zk
+  -- server. e.g. "127.0.0.1:3000,127.0.0.1:3001,127.0.0.1:3002"
+  -> T.WatcherFn
+  -- ^ the global watcher callback function. When notifications are
+  -- triggered this function will be invoked.
+  -> CInt
+  -- ^ timeout
+  -> Maybe T.ClientID
+  -- ^ The id of a previously established session that this client will be
+  -- reconnecting to. Pass 'Nothing' if not reconnecting to a previous
+  -- session. Clients can access the session id of an established, valid,
+  -- connection by calling 'zooGetClientID'. If the session corresponding to
+  -- the specified clientid has expired, or if the clientid is invalid for
+  -- any reason, the returned 'T.ZHandle' will be invalid -- the 'T.ZHandle'
+  -- state will indicate the reason for failure (typically 'T.ZooExpiredSession').
+  -> CInt
+  -- ^ flags, reserved for future use. Should be set to zero.
+  -> Res.Resource T.ZHandle
+zookeeperResInitWithWatcher host fn timeout mclientid flags = fst <$>
+  Res.initResource (zookeeperInitWithWatcher host fn timeout mclientid flags)
+                   (\(zh', fn')-> freeHaskellFunPtr fn' >> zookeeperClose zh')
 
 -- | Create a node.
 --
@@ -684,9 +712,36 @@ zookeeperInit host timeout mclientid flags = do
       I.ZooConnectedState -> return zhResult
       state -> E.throwIO $ E.ZINVALIDSTATE $ E.ZooExInfo (Text.toText state) callStack
 
-{-# INLINABLE zookeeperClose #-}
+zookeeperInitWithWatcher
+  :: CBytes
+  -- ^ host, comma separated host:port pairs, each corresponding to a zk
+  -- server. e.g. "127.0.0.1:3000,127.0.0.1:3001,127.0.0.1:3002"
+  -> T.WatcherFn
+  -- ^ the global watcher callback function. When notifications are
+  -- triggered this function will be invoked.
+  -> CInt
+  -- ^ timeout
+  -> Maybe T.ClientID
+  -- ^ The id of a previously established session that this client will be
+  -- reconnecting to. Pass 'Nothing' if not reconnecting to a previous
+  -- session. Clients can access the session id of an established, valid,
+  -- connection by calling 'zooGetClientID'. If the session corresponding to
+  -- the specified clientid has expired, or if the clientid is invalid for
+  -- any reason, the returned 'T.ZHandle' will be invalid -- the 'T.ZHandle'
+  -- state will indicate the reason for failure (typically 'T.ZooExpiredSession').
+  -> CInt
+  -- ^ flags, reserved for future use. Should be set to zero.
+  -> IO (T.ZHandle, FunPtr I.CWatcherFn)
+zookeeperInitWithWatcher host fn timeout mclientid flags = do
+  let clientid = fromMaybe (I.ClientID nullPtr) mclientid
+  fnPtr <- I.mkWatcherFnPtr fn
+  zh <- CBytes.withCBytes host $ \host' -> do
+    I.zookeeper_init host' fnPtr timeout clientid nullPtr flags
+  return (zh, fnPtr)
+
 zookeeperClose :: T.ZHandle -> IO ()
 zookeeperClose = void . E.throwZooErrorIfNotOK <=< I.c_zookeeper_close_safe
+{-# INLINABLE zookeeperClose #-}
 
 -- | Return the client session id, only valid if the connections
 -- is currently connected (ie. last watcher state is 'T.ZooConnectedState')

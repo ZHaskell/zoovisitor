@@ -19,6 +19,9 @@ import qualified Z.Foreign         as Z
 
 -------------------------------------------------------------------------------
 
+type CWatcherFn = ZHandle -> CInt     -> CInt     -> CString -> Ptr () -> IO ()
+type WatcherFn  = ZHandle -> ZooEvent -> ZooState -> CBytes            -> IO ()
+
 newtype ZHandle = ZHandle { unZHandle :: Ptr () }
   deriving (Show, Eq)
 

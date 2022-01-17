@@ -16,6 +16,7 @@ import           Foreign.StablePtr
 import           GHC.Conc
 import           GHC.Stack                    (HasCallStack)
 import           Text.ParserCombinators.ReadP (readP_to_S)
+import qualified Z.Data.CBytes                as CBytes
 import           Z.Foreign
 
 import           ZooKeeper.Exception
@@ -44,12 +45,30 @@ foreign import ccall unsafe "hs_zk.h &logLevel"
 foreign import ccall unsafe "hs_zk.h zoo_set_debug_level"
   zooSetDebugLevel :: ZooLogLevel -> IO ()
 
+foreign import ccall "wrapper"
+  mkCWatcherFnPtr :: CWatcherFn -> IO (FunPtr CWatcherFn)
+
+mkWatcherFnPtr :: WatcherFn -> IO (FunPtr CWatcherFn)
+mkWatcherFnPtr fn = mkCWatcherFnPtr $ \zh ev st cpath _ctx -> do
+  path <- CBytes.fromCString cpath
+  fn zh (ZooEvent ev) (ZooState st) path
+
 foreign import ccall unsafe "hs_zk.h hs_zookeeper_init"
   c_hs_zookeeper_init
     :: StablePtr PrimMVar -> Int -> Ptr HsWatcherCtx
     -> BA## Word8
     -> CInt
     -> ClientID
+    -> CInt
+    -> IO ZHandle
+
+foreign import ccall safe "zookeeper.h zookeeper_init"
+  zookeeper_init
+    :: Ptr Word8
+    -> FunPtr CWatcherFn
+    -> CInt
+    -> ClientID
+    -> Ptr a
     -> CInt
     -> IO ZHandle
 
@@ -214,6 +233,9 @@ foreign import ccall unsafe "hs_zk.h hs_zoo_set_op_init"
     -> CInt
     -> MBA## Word8     -- pointer to Stat
     -> IO ()
+
+foreign import ccall safe "zookeeper.h zoo_set_watcher"
+  zoo_set_watcher :: ZHandle -> FunPtr CWatcherFn -> IO (FunPtr CWatcherFn)
 
 foreign import ccall unsafe "hs_zk.h zoo_check_op_init"
   c_zoo_check_op_init :: Ptr CZooOp -> BA## Word8 -> CInt -> IO ()
