@@ -235,18 +235,7 @@ void hs_acl_completion_fn(int rc, struct ACL_vector* acl, struct Stat* stat,
 }
 
 // ----------------------------------------------------------------------------
-
-zhandle_t* hs_zookeeper_init(HsStablePtr mvar, HsInt cap,
-                             hs_watcher_ctx_t* watcher_ctx, const char* host,
-                             int recv_timeout, const clientid_t* clientid,
-                             int flags) {
-  watcher_ctx->mvar = mvar;
-  watcher_ctx->cap = cap;
-  zhandle_t* zh = zookeeper_init(host, hs_zookeeper_watcher_fn, recv_timeout,
-                                 clientid, watcher_ctx, flags);
-  return zh;
-}
-
+// Operations
 // ----------------------------------------------------------------------------
 
 int hs_zoo_acreate(zhandle_t* zh, const char* path, const char* value,

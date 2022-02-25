@@ -21,7 +21,7 @@ recvTimeout :: CInt
 recvTimeout = 5000
 
 client :: Resource ZHandle
-client = zookeeperResInit "127.0.0.1:2182" recvTimeout Nothing 0
+client = zookeeperResInit "127.0.0.1:2182" Nothing recvTimeout Nothing 0
 
 main :: IO ()
 main = withResource client $ \zh -> do

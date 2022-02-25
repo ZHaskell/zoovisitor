@@ -53,15 +53,6 @@ mkWatcherFnPtr fn = mkCWatcherFnPtr $ \zh ev st cpath _ctx -> do
   path <- CBytes.fromCString cpath
   fn zh (ZooEvent ev) (ZooState st) path
 
-foreign import ccall unsafe "hs_zk.h hs_zookeeper_init"
-  c_hs_zookeeper_init
-    :: StablePtr PrimMVar -> Int -> Ptr HsWatcherCtx
-    -> BA## Word8
-    -> CInt
-    -> ClientID
-    -> CInt
-    -> IO ZHandle
-
 foreign import ccall safe "zookeeper.h zookeeper_init"
   zookeeper_init
     :: Ptr Word8
@@ -73,7 +64,7 @@ foreign import ccall safe "zookeeper.h zookeeper_init"
     -> IO ZHandle
 
 foreign import ccall safe "hs_zk.h zookeeper_close"
-  c_zookeeper_close_safe :: ZHandle -> IO CInt
+  c_zookeeper_close :: ZHandle -> IO CInt
 
 foreign import ccall unsafe "hs_zk.h zoo_client_id"
   c_zoo_client_id :: ZHandle -> IO ClientID
