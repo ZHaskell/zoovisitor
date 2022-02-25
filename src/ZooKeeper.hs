@@ -3,7 +3,6 @@ module ZooKeeper
   , I.zooSetDebugLevel
 
   , zookeeperResInit
-  , zookeeperResInitWithWatcher
   , Res.withResource
   , Res.Resource
 
@@ -34,26 +33,18 @@ module ZooKeeper
 
     -- * Internal function (should NOT be used)
   , zookeeperInit
-  , zookeeperInitWithWatcher
   , zookeeperClose
   ) where
 
-import           Control.Concurrent       (forkIO, myThreadId, newEmptyMVar,
-                                           takeMVar, threadCapability)
-import           Control.Exception        (mask_, onException)
 import           Control.Monad            (void, when, zipWithM, (<=<))
 import           Data.Bifunctor           (first)
 import           Data.Maybe               (fromMaybe)
 import           Foreign.C                (CInt)
-import           Foreign.ForeignPtr       (mallocForeignPtrBytes,
-                                           touchForeignPtr, withForeignPtr)
 import           Foreign.Ptr              (FunPtr, Ptr, freeHaskellFunPtr,
-                                           nullPtr, plusPtr)
-import           GHC.Conc                 (newStablePtrPrimMVar)
-import           GHC.Stack                (HasCallStack, callStack)
+                                           nullFunPtr, nullPtr, plusPtr)
+import           GHC.Stack                (HasCallStack)
 import           Z.Data.CBytes            (CBytes)
 import qualified Z.Data.CBytes            as CBytes
-import qualified Z.Data.Text.Print        as Text
 import           Z.Data.Vector            (Bytes)
 import qualified Z.Foreign                as Z
 import qualified Z.IO.FileSystem.FilePath as ZF
@@ -66,37 +57,18 @@ import qualified ZooKeeper.Types          as T
 
 -------------------------------------------------------------------------------
 
+-- TODO: use ForeignPtr instead of resource style?
+
 -- | Create a resource of handle to used communicate with zookeeper.
 zookeeperResInit
-  :: HasCallStack
-  => CBytes
-  -- ^ host, comma separated host:port pairs, each corresponding to a zk
-  -- server. e.g. "127.0.0.1:3000,127.0.0.1:3001,127.0.0.1:3002"
-  -> CInt
-  -- ^ timeout
-  -> Maybe T.ClientID
-  -- ^ The id of a previously established session that this client will be
-  -- reconnecting to. Pass 'Nothing' if not reconnecting to a previous
-  -- session. Clients can access the session id of an established, valid,
-  -- connection by calling 'zooGetClientID'. If the session corresponding to
-  -- the specified clientid has expired, or if the clientid is invalid for
-  -- any reason, the returned 'T.ZHandle' will be invalid -- the 'T.ZHandle'
-  -- state will indicate the reason for failure (typically 'T.ZooExpiredSession').
-  -> CInt
-  -- ^ flags, reserved for future use. Should be set to zero.
-  -> Res.Resource T.ZHandle
-zookeeperResInit host timeout mclientid flags =
-  Res.initResource (zookeeperInit host timeout mclientid flags) zookeeperClose
-
-zookeeperResInitWithWatcher
   :: CBytes
   -- ^ host, comma separated host:port pairs, each corresponding to a zk
   -- server. e.g. "127.0.0.1:3000,127.0.0.1:3001,127.0.0.1:3002"
-  -> T.WatcherFn
+  -> Maybe T.WatcherFn
   -- ^ the global watcher callback function. When notifications are
   -- triggered this function will be invoked.
   -> CInt
-  -- ^ timeout
+  -- ^ session expiration time in milliseconds
   -> Maybe T.ClientID
   -- ^ The id of a previously established session that this client will be
   -- reconnecting to. Pass 'Nothing' if not reconnecting to a previous
@@ -108,9 +80,8 @@ zookeeperResInitWithWatcher
   -> CInt
   -- ^ flags, reserved for future use. Should be set to zero.
   -> Res.Resource T.ZHandle
-zookeeperResInitWithWatcher host fn timeout mclientid flags = fst <$>
-  Res.initResource (zookeeperInitWithWatcher host fn timeout mclientid flags)
-                   (\(zh', fn')-> freeHaskellFunPtr fn' >> zookeeperClose zh')
+zookeeperResInit host fn timeout mclientid flags = fst <$>
+  Res.initResource (zookeeperInit host fn timeout mclientid flags) zookeeperClose
 
 -- | Create a node.
 --
@@ -678,49 +649,14 @@ zooCheckOpInit path version = I.ZooCheckOp $ \op -> do
 -- If it fails to create a new zhandle or not connected, an exception will be
 -- throwed.
 zookeeperInit
-  :: HasCallStack
-  => CBytes
-  -- ^ host, comma separated host:port pairs, each corresponding to a zk
-  -- server. e.g. "127.0.0.1:3000,127.0.0.1:3001,127.0.0.1:3002"
-  -> CInt
-  -- ^ timeout
-  -> Maybe T.ClientID
-  -- ^ The id of a previously established session that this client will be
-  -- reconnecting to. Pass 'Nothing' if not reconnecting to a previous
-  -- session. Clients can access the session id of an established, valid,
-  -- connection by calling 'zooGetClientID'. If the session corresponding to
-  -- the specified clientid has expired, or if the clientid is invalid for
-  -- any reason, the returned 'T.ZHandle' will be invalid -- the 'T.ZHandle'
-  -- state will indicate the reason for failure (typically 'T.ZooExpiredSession').
-  -> CInt
-  -- ^ flags, reserved for future use. Should be set to zero.
-  -> IO T.ZHandle
-zookeeperInit host timeout mclientid flags = do
-  let clientid = fromMaybe (I.ClientID nullPtr) mclientid
-  CBytes.withCBytesUnsafe host $ \host' -> mask_ $ do
-    mvar <- newEmptyMVar
-    sp <- newStablePtrPrimMVar mvar  -- freed by hs_try_takemvar()
-    ctx <- mallocForeignPtrBytes I.hsWatcherCtxSize
-    (ctxResult, zhResult) <- withForeignPtr ctx $ \ctx' -> do
-      (cap, _) <- threadCapability =<< myThreadId
-      zh <- I.c_hs_zookeeper_init sp cap ctx' host' timeout clientid flags
-      when (zh == I.ZHandle nullPtr) $ E.getCErrNum >>= flip E.throwZooError callStack
-      takeMVar mvar `onException` forkIO (do takeMVar mvar; touchForeignPtr ctx)
-      ctxData <- I.peekHsWatcherCtx ctx'
-      return (ctxData, zh)
-    case I.watcherCtxState ctxResult of
-      I.ZooConnectedState -> return zhResult
-      state -> E.throwIO $ E.ZINVALIDSTATE $ E.ZooExInfo (Text.toText state) callStack
-
-zookeeperInitWithWatcher
   :: CBytes
   -- ^ host, comma separated host:port pairs, each corresponding to a zk
   -- server. e.g. "127.0.0.1:3000,127.0.0.1:3001,127.0.0.1:3002"
-  -> T.WatcherFn
+  -> Maybe T.WatcherFn
   -- ^ the global watcher callback function. When notifications are
   -- triggered this function will be invoked.
   -> CInt
-  -- ^ timeout
+  -- ^ session expiration time in milliseconds
   -> Maybe T.ClientID
   -- ^ The id of a previously established session that this client will be
   -- reconnecting to. Pass 'Nothing' if not reconnecting to a previous
@@ -732,15 +668,17 @@ zookeeperInitWithWatcher
   -> CInt
   -- ^ flags, reserved for future use. Should be set to zero.
   -> IO (T.ZHandle, FunPtr I.CWatcherFn)
-zookeeperInitWithWatcher host fn timeout mclientid flags = do
+zookeeperInit host mfn timeout mclientid flags = do
   let clientid = fromMaybe (I.ClientID nullPtr) mclientid
-  fnPtr <- I.mkWatcherFnPtr fn
+  fnPtr <- maybe (pure nullFunPtr) I.mkWatcherFnPtr mfn
   zh <- CBytes.withCBytes host $ \host' -> do
     I.zookeeper_init host' fnPtr timeout clientid nullPtr flags
   return (zh, fnPtr)
 
-zookeeperClose :: T.ZHandle -> IO ()
-zookeeperClose = void . E.throwZooErrorIfNotOK <=< I.c_zookeeper_close_safe
+zookeeperClose :: (T.ZHandle, FunPtr I.CWatcherFn) -> IO ()
+zookeeperClose (zh, fnptr) = do
+  when (fnptr /= nullFunPtr) $ freeHaskellFunPtr fnptr
+  void $ E.throwZooErrorIfNotOK =<< I.c_zookeeper_close zh
 {-# INLINABLE zookeeperClose #-}
 
 -- | Return the client session id, only valid if the connections
