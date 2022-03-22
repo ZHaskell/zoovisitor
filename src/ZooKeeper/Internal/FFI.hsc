@@ -1,3 +1,4 @@
+{-# LANGUAGE CApiFFI          #-}
 {-# LANGUAGE CPP              #-}
 {-# LANGUAGE UnliftedFFITypes #-}
 
@@ -228,10 +229,10 @@ foreign import ccall unsafe "hs_zk.h hs_zoo_set_op_init"
 foreign import ccall safe "zookeeper.h zoo_set_watcher"
   zoo_set_watcher :: ZHandle -> FunPtr CWatcherFn -> IO (FunPtr CWatcherFn)
 
-foreign import ccall unsafe "hs_zk.h zoo_check_op_init"
+foreign import ccall unsafe "zookeeper.h zoo_check_op_init"
   c_zoo_check_op_init :: Ptr CZooOp -> BA## Word8 -> CInt -> IO ()
 
-foreign import ccall unsafe "hs_zk.h is_unrecoverable"
+foreign import ccall unsafe "zookeeper.h is_unrecoverable"
   c_is_unrecoverable :: ZHandle -> IO CInt
 
 -------------------------------------------------------------------------------
@@ -296,4 +297,4 @@ withZKAsync2 size1 peekRet1 peekData1 f1 size2 peekRet2 peekData2 f2 g = mask_ $
       case rc1 of
         CZOK -> f1 =<< Right <$> peekData1 data1'
         _    -> f1 $ Left rc1
-{-# INLINE withZKAsync2 #-}
+{-# INLINABLE withZKAsync2 #-}

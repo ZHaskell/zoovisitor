@@ -43,8 +43,8 @@ import           Foreign.C                (CInt)
 import           Foreign.Ptr              (FunPtr, Ptr, freeHaskellFunPtr,
                                            nullFunPtr, nullPtr, plusPtr)
 import           GHC.Stack                (HasCallStack)
-import           Z.Data.CBytes            (CBytes)
 import qualified Z.Data.CBytes            as CBytes
+import           Z.Data.CBytes            (CBytes)
 import           Z.Data.Vector            (Bytes)
 import qualified Z.Foreign                as Z
 import qualified Z.IO.FileSystem.FilePath as ZF
@@ -66,7 +66,8 @@ zookeeperResInit
   -- server. e.g. "127.0.0.1:3000,127.0.0.1:3001,127.0.0.1:3002"
   -> Maybe T.WatcherFn
   -- ^ the global watcher callback function. When notifications are
-  -- triggered this function will be invoked.
+  -- triggered this function will be invoked. FIXME: Calling any zoo operations
+  -- (e.g. zooGet) will cause an infinite block.
   -> CInt
   -- ^ session expiration time in milliseconds
   -> Maybe T.ClientID
@@ -205,8 +206,10 @@ zooWatchGet
   -> CBytes
   -> (T.HsWatcherCtx -> IO ())
   -- ^ The watcher callback.
-  --
   -- A watch will be set at the server to notify the client if the node changes.
+  --
+  --  /NOTE: this works different with c client. You will only receive data
+  --  and child watches, no session watches./
   -> (T.DataCompletion -> IO ())
   -- ^ The result callback when the request completes.
   --
@@ -319,6 +322,9 @@ zooWatchExists
   -- A watch will set on the specified znode on the server. The watch will be
   -- set even if the node does not exist. This allows clients to watch for
   -- nodes to appear.
+  --
+  --  /NOTE: this works different with c client. You will only receive data
+  --  and child watches, no session watches./
   -> (Maybe T.StatCompletion -> IO ())
   -- ^ The result callback when the request completes. Nothing means
   -- the node does not exist.
@@ -386,6 +392,9 @@ zooWatchGetChildren
   -> (T.HsWatcherCtx -> IO ())
   -- ^ The watcher callback. A watch will be set at the server to notify
   --  the client if the node changes.
+  --
+  --  /NOTE: this works different with c client. You will only receive data
+  --  and child watches, no session watches./
   -> (T.StringsCompletion -> IO ())
   -- ^ The result callback when the request completes.
   --
@@ -454,6 +463,8 @@ zooWatchGetChildren2
   -> (T.HsWatcherCtx -> IO ())
   -- ^ The watcher callback. A watch will be set at the server to notify
   --  the client if the node changes.
+  --  /NOTE: this works different with c client. You will only receive data
+  --  and child watches, no session watches./
   -> (T.StringsStatCompletion -> IO ())
   -- ^ The result callback when the request completes.
   --
@@ -654,7 +665,8 @@ zookeeperInit
   -- server. e.g. "127.0.0.1:3000,127.0.0.1:3001,127.0.0.1:3002"
   -> Maybe T.WatcherFn
   -- ^ the global watcher callback function. When notifications are
-  -- triggered this function will be invoked.
+  -- triggered this function will be invoked. FIXME: Calling any zoo operations
+  -- (e.g. zooGet) will cause an infinite block.
   -> CInt
   -- ^ session expiration time in milliseconds
   -> Maybe T.ClientID
