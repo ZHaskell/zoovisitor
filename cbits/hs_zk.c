@@ -1,17 +1,31 @@
 #include "hs_zk.h"
 
 // ----------------------------------------------------------------------------
+// Helpers
+// ----------------------------------------------------------------------------
+
+const stat_t* dup_stat(const stat_t* old_stat);
+const string_vector_t* dup_string_vector(const string_vector_t* old_strings);
+const acl_vector_t* dup_acl_vector(const acl_vector_t* old_acls);
+
+// ----------------------------------------------------------------------------
 // Callback Functions
 // ----------------------------------------------------------------------------
 
-void hs_zookeeper_watcher_fn(zhandle_t* zh, int type, int state,
-                             const char* path, void* watcherCtx) {
-  hs_watcher_ctx_t* watcher_ctx = (hs_watcher_ctx_t*)watcherCtx;
-  watcher_ctx->zh = zh;
-  watcher_ctx->type = type;
-  watcher_ctx->state = state;
-  watcher_ctx->path = strdup(path);
-  hs_try_putmvar(watcher_ctx->cap, watcher_ctx->mvar);
+void hs_zookeeper_node_watcher_fn(zhandle_t* zh, int type, int state,
+                                  const char* path, void* watcherCtx) {
+  if (type != ZOO_SESSION_EVENT) {
+    hs_watcher_ctx_t* watcher_ctx = (hs_watcher_ctx_t*)watcherCtx;
+    watcher_ctx->zh = zh;
+    watcher_ctx->type = type;
+    watcher_ctx->state = state;
+    watcher_ctx->path = strdup(path);
+    hs_try_putmvar(watcher_ctx->cap, watcher_ctx->mvar);
+  } else {
+    fprintf(stderr,
+            "zoovisitor.hs_zookeeper_node_watcher_fn: ignore event type: %d\n",
+            type);
+  }
 }
 
 /**
@@ -262,7 +276,7 @@ int hs_zoo_awget(zhandle_t* zh, const char* path, HsStablePtr mvar_w,
   watcher_ctx->cap = cap;
   data_completion->mvar = mvar_f;
   data_completion->cap = cap;
-  return zoo_awget(zh, path, hs_zookeeper_watcher_fn, watcher_ctx,
+  return zoo_awget(zh, path, hs_zookeeper_node_watcher_fn, watcher_ctx,
                    hs_data_completion_fn, data_completion);
 }
 
@@ -298,7 +312,7 @@ int hs_zoo_awexists(zhandle_t* zh, const char* path, HsStablePtr mvar_w,
   watcher_ctx->cap = cap;
   stat_completion->mvar = mvar_f;
   stat_completion->cap = cap;
-  return zoo_awexists(zh, path, hs_zookeeper_watcher_fn, watcher_ctx,
+  return zoo_awexists(zh, path, hs_zookeeper_node_watcher_fn, watcher_ctx,
                       hs_stat_completion_fn, stat_completion);
 }
 
@@ -319,7 +333,7 @@ int hs_zoo_awget_children(zhandle_t* zh, const char* path, HsStablePtr mvar_w,
   watcher_ctx->cap = cap;
   strings_completion->mvar = mvar_f;
   strings_completion->cap = cap;
-  return zoo_awget_children(zh, path, hs_zookeeper_watcher_fn, watcher_ctx,
+  return zoo_awget_children(zh, path, hs_zookeeper_node_watcher_fn, watcher_ctx,
                             hs_strings_completion_fn, strings_completion);
 }
 
@@ -340,8 +354,9 @@ int hs_zoo_awget_children2(zhandle_t* zh, const char* path, HsStablePtr mvar_w,
   watcher_ctx->cap = cap;
   strings_stat->mvar = mvar_f;
   strings_stat->cap = cap;
-  return zoo_awget_children2(zh, path, hs_zookeeper_watcher_fn, watcher_ctx,
-                             hs_strings_stat_completion_fn, strings_stat);
+  return zoo_awget_children2(zh, path, hs_zookeeper_node_watcher_fn,
+                             watcher_ctx, hs_strings_stat_completion_fn,
+                             strings_stat);
 }
 
 int hs_zoo_aget_acl(zhandle_t* zh, const char* path, HsStablePtr mvar,
@@ -372,4 +387,50 @@ void hs_zoo_set_op_init(zoo_op_t* op, const char* path, const char* value,
                         HsInt valoffset, HsInt valuelen, int version,
                         stat_t* stat) {
   zoo_set_op_init(op, path, value + valoffset, valuelen, version, stat);
+}
+
+// ----------------------------------------------------------------------------
+// Helpers
+
+const stat_t* dup_stat(const stat_t* old_stat) {
+  stat_t* new_stat = (stat_t*)malloc(sizeof(stat_t));
+  new_stat = memcpy(new_stat, old_stat, sizeof(stat_t));
+  return new_stat;
+}
+
+const string_vector_t* dup_string_vector(const string_vector_t* old_strings) {
+  int count = old_strings->count;
+  if (count < 0) {
+    fprintf(stderr, "dup_string_vector error: count %d\n", count);
+    return NULL;
+  }
+  string_vector_t* new_strings =
+      (string_vector_t*)malloc(sizeof(string_vector_t));
+  char** vals = malloc(count * sizeof(char*));
+  for (int i = 0; i < count; ++i) {
+    vals[i] = strdup(old_strings->data[i]);
+  }
+  new_strings->count = count;
+  new_strings->data = vals;
+  return new_strings;
+}
+
+const acl_vector_t* dup_acl_vector(const acl_vector_t* old_acls) {
+  int count = old_acls->count;
+  if (count < 0) {
+    fprintf(stderr, "dup_acl_vector error: count %d\n", count);
+    return NULL;
+  }
+  acl_t* data = (acl_t*)malloc(count * sizeof(acl_t));
+  acl_t* old_data = old_acls->data;
+  for (int i = 0; i < count; ++i) {
+    data[i].perms = old_data[i].perms;
+    data[i].id.scheme = strdup(old_data[i].id.scheme);
+    data[i].id.id = strdup(old_data[i].id.id);
+  }
+
+  acl_vector_t* new_acls = (acl_vector_t*)malloc(sizeof(acl_vector_t));
+  new_acls->count = count;
+  new_acls->data = data;
+  return new_acls;
 }

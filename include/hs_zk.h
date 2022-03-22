@@ -12,49 +12,6 @@ typedef struct String_vector string_vector_t;
 typedef struct ACL acl_t;
 typedef struct ACL_vector acl_vector_t;
 
-const stat_t* dup_stat(const stat_t* old_stat) {
-  stat_t* new_stat = (stat_t*)malloc(sizeof(stat_t));
-  new_stat = memcpy(new_stat, old_stat, sizeof(stat_t));
-  return new_stat;
-}
-
-const string_vector_t* dup_string_vector(const string_vector_t* old_strings) {
-  int count = old_strings->count;
-  if (count < 0) {
-    fprintf(stderr, "dup_string_vector error: count %d\n", count);
-    return NULL;
-  }
-  string_vector_t* new_strings =
-      (string_vector_t*)malloc(sizeof(string_vector_t));
-  char** vals = malloc(count * sizeof(char*));
-  for (int i = 0; i < count; ++i) {
-    vals[i] = strdup(old_strings->data[i]);
-  }
-  new_strings->count = count;
-  new_strings->data = vals;
-  return new_strings;
-}
-
-const acl_vector_t* dup_acl_vector(const acl_vector_t* old_acls) {
-  int count = old_acls->count;
-  if (count < 0) {
-    fprintf(stderr, "dup_acl_vector error: count %d\n", count);
-    return NULL;
-  }
-  acl_t* data = (acl_t*)malloc(count * sizeof(acl_t));
-  acl_t* old_data = old_acls->data;
-  for (int i = 0; i < count; ++i) {
-    data[i].perms = old_data[i].perms;
-    data[i].id.scheme = strdup(old_data[i].id.scheme);
-    data[i].id.id = strdup(old_data[i].id.id);
-  }
-
-  acl_vector_t* new_acls = (acl_vector_t*)malloc(sizeof(acl_vector_t));
-  new_acls->count = count;
-  new_acls->data = data;
-  return new_acls;
-}
-
 typedef struct hs_watcher_ctx_t {
   HsStablePtr mvar;
   HsInt cap;
