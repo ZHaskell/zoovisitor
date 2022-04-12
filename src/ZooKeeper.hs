@@ -36,6 +36,7 @@ module ZooKeeper
   , zookeeperClose
   ) where
 
+import           Control.Exception        (catch)
 import           Control.Monad            (void, when, zipWithM, (<=<))
 import           Data.Bifunctor           (first)
 import           Data.Maybe               (fromMaybe)
@@ -265,7 +266,7 @@ zooDeleteAll :: HasCallStack => T.ZHandle -> CBytes -> IO ()
 zooDeleteAll zh path = do
   T.StringsCompletion (T.StringVector children) <- zooGetChildren zh path
   mapM_ (zooDeleteAll zh <=< ZF.join path) children
-  zooDelete zh path Nothing
+  catch (zooDelete zh path Nothing) (\(_::E.ZNONODE) -> pure ())
 
 -- | Checks the existence of a node in zookeeper.
 --
