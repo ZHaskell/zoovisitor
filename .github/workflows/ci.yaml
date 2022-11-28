@@ -12,12 +12,9 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        ghc: ['8.8', '8.10', '9.0']
-        cabal: ['3.2', '3.4']
+        ghc: ['8.8.4', '8.10.7', '9.0.2', '9.2.4']
+        cabal: ['3.6']
         os: [ubuntu-latest, macOS-latest]
-        exclude:
-          - ghc: 9.0
-            cabal: 3.2
 
     name: ghc-${{ matrix.ghc }} cabal-${{matrix.cabal}} on ${{ matrix.os }}
 
