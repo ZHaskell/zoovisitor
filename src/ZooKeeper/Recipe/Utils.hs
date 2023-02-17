@@ -3,9 +3,11 @@ module ZooKeeper.Recipe.Utils
     SequenceNumWithGUID(..)
   , mkSequenceNumWithGUID
   , extractSeqNum
+  , ZkRecipeException (..)
 
     -- * ZNode operations
   , createSeqEphemeralZNode
+
   ) where
 
 import           Control.Exception
@@ -65,3 +67,9 @@ createSeqEphemeralZNode zk prefixPath guid = do
       case L.find (\child -> CB.unpack guid `L.isSubsequenceOf` CB.unpack child) children of
         Just child -> return $ StringCompletion child
         Nothing    -> createSeqEphemeralZNode zk prefixPath guid
+
+--------------------------------------------------------------------------------
+
+newtype ZkRecipeException = ZkRecipeException String
+  deriving (Show, Eq)
+instance Exception ZkRecipeException

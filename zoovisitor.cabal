@@ -38,14 +38,15 @@ library
   other-modules:
     ZooKeeper.Internal.FFI
     ZooKeeper.Internal.Types
+    ZooKeeper.Internal.Utils
     ZooKeeper.Recipe.Election
     ZooKeeper.Recipe.Lock
     ZooKeeper.Recipe.Utils
 
   build-depends:
-    , base    >=4.12  && <5
-    , Z-Data  >=0.7.2 && <1.2 || ^>=2.0
-    , Z-IO    >=0.7   && <1.1 || ^>=2.0
+    , base        >=4.12  && <5
+    , exceptions  ^>=0.10
+    , Z-Data      >=0.7.2 && <1.2 || ^>=2.0
 
   includes:           hs_zk.h
   c-sources:          cbits/hs_zk.c
