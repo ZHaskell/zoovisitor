@@ -3,8 +3,8 @@ module ZooKeeper
   , I.zooSetDebugLevel
 
   , zookeeperResInit
-  , Res.withResource
-  , Res.Resource
+  , U.withResource
+  , U.Resource
 
   , zooCreate
   , zooSet
@@ -47,12 +47,11 @@ import qualified Z.Data.CBytes            as CBytes
 import           Z.Data.CBytes            (CBytes)
 import           Z.Data.Vector            (Bytes)
 import qualified Z.Foreign                as Z
-import qualified Z.IO.FileSystem.FilePath as ZF
-import qualified Z.IO.Resource            as Res
 
 import qualified ZooKeeper.Exception      as E
 import qualified ZooKeeper.Internal.FFI   as I
 import qualified ZooKeeper.Internal.Types as I
+import qualified ZooKeeper.Internal.Utils as U
 import qualified ZooKeeper.Types          as T
 
 -------------------------------------------------------------------------------
@@ -80,9 +79,9 @@ zookeeperResInit
   -- state will indicate the reason for failure (typically 'T.ZooExpiredSession').
   -> CInt
   -- ^ flags, reserved for future use. Should be set to zero.
-  -> Res.Resource T.ZHandle
+  -> U.Resource T.ZHandle
 zookeeperResInit host fn timeout mclientid flags = fst <$>
-  Res.initResource (zookeeperInit host fn timeout mclientid flags) zookeeperClose
+  U.initResource (zookeeperInit host fn timeout mclientid flags) zookeeperClose
 
 -- | Create a node.
 --
@@ -260,11 +259,14 @@ zooDelete zh path m_version = CBytes.withCBytesUnsafe path $ \path' ->
 
 -- | Delete a node and all its children in zookeeper.
 --
--- If fail will throw exceptions, check `zooDeleteAll` and `zooGetChildren` for more details
+-- NOTE: the path should not have a trailing '/'
+--
+-- If fails, this will throw exceptions, check `zooDeleteAll` and `zooGetChildren`
+-- for more details.
 zooDeleteAll :: HasCallStack => T.ZHandle -> CBytes -> IO ()
 zooDeleteAll zh path = do
   T.StringsCompletion (T.StringVector children) <- zooGetChildren zh path
-  mapM_ (zooDeleteAll zh <=< ZF.join path) children
+  mapM_ (zooDeleteAll zh . ((path <> "/") <>)) children
   zooDelete zh path Nothing
 
 -- | Checks the existence of a node in zookeeper.
