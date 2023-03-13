@@ -1,6 +1,6 @@
 cabal-version:      2.2
 name:               zoovisitor
-version:            0.2.3.0
+version:            0.2.4.0
 synopsis:
   A haskell binding to Apache Zookeeper C library(mt) using Haskell Z project.
 
@@ -46,7 +46,7 @@ library
   build-depends:
     , base        >=4.12  && <5
     , exceptions  ^>=0.10
-    , Z-Data      >=0.7.2 && <1.2 || ^>=2.0
+    , Z-Data      >=0.7.2 && <1.5 || ^>=2.0
 
   includes:           hs_zk.h
   c-sources:          cbits/hs_zk.c
