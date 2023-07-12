@@ -25,6 +25,9 @@ type WatcherFn  = ZHandle -> ZooEvent -> ZooState -> CBytes            -> IO ()
 newtype ZHandle = ZHandle { unZHandle :: Ptr () }
   deriving (Show, Eq)
 
+-- | This structure holds the id and password for the session. This structure
+-- should be treated as opaque. It is received from the server when a session
+-- is established and needs to be sent back as-is when reconnecting a session.
 newtype ClientID = ClientID { unClientID :: Ptr () }
   deriving (Show, Eq)
 

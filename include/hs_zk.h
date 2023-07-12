@@ -75,11 +75,6 @@ typedef struct hs_acl_completion_t {
 
 // ----------------------------------------------------------------------------
 
-zhandle_t* hs_zookeeper_init(HsStablePtr mvar, HsInt cap,
-                             hs_watcher_ctx_t* watcher_ctx, const char* host,
-                             int recv_timeout, const clientid_t* clientid,
-                             int flags);
-
 int hs_zoo_aget_acl(zhandle_t* zh, const char* path, HsStablePtr mvar,
                     HsInt cap, hs_acl_completion_t* completion);
 

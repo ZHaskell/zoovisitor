@@ -73,7 +73,7 @@ zookeeperResInit
   -- ^ The id of a previously established session that this client will be
   -- reconnecting to. Pass 'Nothing' if not reconnecting to a previous
   -- session. Clients can access the session id of an established, valid,
-  -- connection by calling 'zooGetClientID'. If the session corresponding to
+  -- connection by calling 'zooClientID'. If the session corresponding to
   -- the specified clientid has expired, or if the clientid is invalid for
   -- any reason, the returned 'T.ZHandle' will be invalid -- the 'T.ZHandle'
   -- state will indicate the reason for failure (typically 'T.ZooExpiredSession').
@@ -560,11 +560,13 @@ zooCreateOpInit
   -> Maybe Bytes
   -- ^ The data to be stored in the node.
   -> CInt
-  -- ^ The max buffer size of the created new node path (this might be
-  -- different than the supplied path because of the 'T.ZooSequence' flag).
-  -- If this size is 0,
+  -- ^ Max Size of the buffer results in 'ZooOpResult' which will be filled
+  -- with the path of the new node (this might be different than the supplied
+  -- path because of the 'T.ZooSequence' flag).
   --
   -- Note: we do NOT check if the size is non-negative.
+  --
+  -- If this size is 0, you will get an empty ZooCreateOpResult.
   --
   -- If the path of the new node exceeds the buffer size, the path string will
   -- be truncated to fit. The actual path of the new node in the server will
@@ -576,7 +578,7 @@ zooCreateOpInit
   -- or an OR of the Create Flags
   -> T.ZooOp
 zooCreateOpInit path m_value buflen acl mode = I.ZooCreateOp $ \op -> do
-  let buflen' = buflen + 1  -- including space for the null terminator
+  let buflen' = buflen + 1  --  The path string will always be null-terminated.
   CBytes.withCBytesUnsafe path $ \path' -> do
     mba@(Z.MutableByteArray mba#) <- Z.newPinnedByteArray (fromIntegral buflen')
     case m_value of
@@ -675,7 +677,7 @@ zookeeperInit
   -- ^ The id of a previously established session that this client will be
   -- reconnecting to. Pass 'Nothing' if not reconnecting to a previous
   -- session. Clients can access the session id of an established, valid,
-  -- connection by calling 'zooGetClientID'. If the session corresponding to
+  -- connection by calling 'zooClientID'. If the session corresponding to
   -- the specified clientid has expired, or if the clientid is invalid for
   -- any reason, the returned 'T.ZHandle' will be invalid -- the 'T.ZHandle'
   -- state will indicate the reason for failure (typically 'T.ZooExpiredSession').
@@ -695,7 +697,7 @@ zookeeperClose (zh, fnptr) = do
   void $ E.throwZooErrorIfNotOK =<< I.c_zookeeper_close zh
 {-# INLINABLE zookeeperClose #-}
 
--- | Return the client session id, only valid if the connections
+-- | Return the opaque client session id, only valid if the connections
 -- is currently connected (ie. last watcher state is 'T.ZooConnectedState')
 zooClientID :: T.ZHandle -> IO T.ClientID
 zooClientID = I.c_zoo_client_id
