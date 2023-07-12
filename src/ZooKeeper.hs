@@ -7,6 +7,7 @@ module ZooKeeper
   , U.Resource
 
   , zooCreate
+  , zooCreateIfMissing
   , zooSet
   , zooGet
   , zooWatchGet
@@ -25,6 +26,7 @@ module ZooKeeper
   , zooDeleteOpInit
   , zooSetOpInit
   , zooCheckOpInit
+  , assertZooOpResultOK
 
   , zooClientID
   , I.peekClientId
@@ -37,6 +39,7 @@ module ZooKeeper
   , zookeeperClose
   ) where
 
+import Control.Exception (catch)
 import           Control.Monad            (void, when, zipWithM, (<=<))
 import           Data.Bifunctor           (first)
 import           Data.Maybe               (fromMaybe)
@@ -130,6 +133,19 @@ zooCreate zh path m_value acl mode =
         E.throwZooErrorIfLeft =<< I.withZKAsync csize I.peekRet I.peekData cfun
   where
     csize = I.csize @T.StringCompletion
+
+-- TODO: Add option to create its parents too
+-- see: https://hackage.haskell.org/package/directory-1.3.7.0/docs/System-Directory.html#v:createDirectoryIfMissing
+zooCreateIfMissing
+  :: T.ZHandle
+  -> CBytes
+  -> Maybe Bytes
+  -> T.AclVector
+  -> T.CreateMode
+  -> IO (Maybe T.StringCompletion)
+zooCreateIfMissing zh path m_value acl mode =
+  catch (Just <$> zooCreate zh path m_value acl mode) $
+    \(_ :: E.ZNODEEXISTS) -> pure Nothing
 
 -- | Sets the data associated with a node.
 --
@@ -540,6 +556,13 @@ zooMulti zh ops = do
     I.withZKAsync' (concatMap snd res) completionSize I.peekRet I.peekData
                    (I.c_hs_zoo_amulti zh (fromIntegral len) mbai# mbar#)
   zipWithM ($) (map fst res) (chunkPtr ptr_result I.zooOpResultSize)
+
+assertZooOpResultOK :: HasCallStack => T.ZooOpResult -> IO ()
+assertZooOpResultOK (T.ZooCreateOpResult ret _) = void $ E.throwZooErrorIfNotOK ret
+assertZooOpResultOK (T.ZooDeleteOpResult ret)   = void $ E.throwZooErrorIfNotOK ret
+assertZooOpResultOK (T.ZooSetOpResult ret _)    = void $ E.throwZooErrorIfNotOK ret
+assertZooOpResultOK (T.ZooCheckOpResult ret)    = void $ E.throwZooErrorIfNotOK ret
+{-# INLINE assertZooOpResultOK #-}
 
 -- | Internal helper function to set zoo op.
 initOp :: (I.ZooOp, Ptr I.CZooOp)
