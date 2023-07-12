@@ -1,4 +1,5 @@
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE RecordWildCards   #-}
 
 module Main where
 
@@ -112,6 +113,12 @@ propSpec zh = do
   describe "ZooKeeper.zooState" $ do
     it "test get state" $ do
       zooState zh `shouldReturn` ZooConnectedState
+
+  describe "ZooKeeper.zooClientID" $ do
+    it "test get data of ClientID" $ do
+      zooState zh `shouldReturn` ZooConnectedState
+      HsClientID{..} <- peekClientId =<< zooClientID zh
+      clientId `shouldNotBe` 0
 
   describe "ZooKeeper.zooRecvTimeout" $ do
     it "test receive timeout" $ do

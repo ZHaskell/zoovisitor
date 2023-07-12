@@ -3,17 +3,19 @@
 
 module ZooKeeper.Internal.Types where
 
-import           Control.Exception (bracket_)
-import           Control.Monad     (forM)
+import           Control.Exception     (bracket_)
+import           Control.Monad         (forM)
+import           Data.ByteString.Short (ShortByteString)
+import qualified Data.ByteString.Short as BShort (packCStringLen)
 import           Data.Int
 import           Foreign
 import           Foreign.C
-import           Numeric           (showHex)
-import           Z.Data.CBytes     (CBytes)
-import qualified Z.Data.CBytes     as CBytes
-import qualified Z.Data.Text       as Text
-import           Z.Data.Vector     (Bytes)
-import qualified Z.Foreign         as Z
+import           Numeric               (showHex)
+import qualified Z.Data.CBytes         as CBytes
+import           Z.Data.CBytes         (CBytes)
+import qualified Z.Data.Text           as Text
+import           Z.Data.Vector         (Bytes)
+import qualified Z.Foreign             as Z
 
 #include "hs_zk.h"
 
@@ -33,14 +35,17 @@ newtype ClientID = ClientID { unClientID :: Ptr () }
 
 data HsClientID = HsClientID
   { clientId     :: {-# UNPACK #-} !Int64
-  , clientPasswd :: {-# UNPACK #-} !CBytes
+  , clientPasswd :: {-# UNPACK #-} !ShortByteString
   } deriving (Show, Eq)
 
 peekClientId :: ClientID -> IO HsClientID
 peekClientId (ClientID ptr) = do
   client_id <- (#peek clientid_t, client_id) ptr
+  -- definition in c: char passwd[16];
+  let passwd_ptr = (#ptr clientid_t, passwd) ptr
+      passwd_len = (#size ((clientid_t *)0)->passwd)
   -- the pointer is getting from zhandle, so here we don't need to free it
-  passwd <- CBytes.fromCString =<< (#peek clientid_t, passwd) ptr
+  passwd <- BShort.packCStringLen (passwd_ptr, passwd_len)
   pure $ HsClientID{clientId=client_id, clientPasswd=passwd}
 
 newtype ZooLogLevel = ZooLogLevel CInt

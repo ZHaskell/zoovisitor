@@ -44,9 +44,10 @@ library
     ZooKeeper.Recipe.Utils
 
   build-depends:
-    , base        >=4.12  && <5
+    , base        >=4.12      && <5
+    , bytestring  >=0.10.10.0
     , exceptions  ^>=0.10
-    , Z-Data      >=0.7.2 && <1.5 || ^>=2.0
+    , Z-Data      >=0.7.2     && <1.5 || ^>=2.0
 
   includes:           hs_zk.h
   c-sources:          cbits/hs_zk.c
