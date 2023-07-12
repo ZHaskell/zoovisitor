@@ -1,6 +1,7 @@
 module ZooKeeper.Types
   ( I.ZHandle
   , I.ClientID
+  , I.HsClientID (..)
   , I.WatcherFn
 
   , I.ZooOp

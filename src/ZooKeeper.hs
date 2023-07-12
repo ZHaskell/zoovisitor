@@ -27,6 +27,7 @@ module ZooKeeper
   , zooCheckOpInit
 
   , zooClientID
+  , I.peekClientId
   , zooState
   , zooRecvTimeout
   , isUnrecoverable

@@ -31,6 +31,18 @@ newtype ZHandle = ZHandle { unZHandle :: Ptr () }
 newtype ClientID = ClientID { unClientID :: Ptr () }
   deriving (Show, Eq)
 
+data HsClientID = HsClientID
+  { clientId     :: {-# UNPACK #-} !Int64
+  , clientPasswd :: {-# UNPACK #-} !CBytes
+  } deriving (Show, Eq)
+
+peekClientId :: ClientID -> IO HsClientID
+peekClientId (ClientID ptr) = do
+  client_id <- (#peek clientid_t, client_id) ptr
+  -- the pointer is getting from zhandle, so here we don't need to free it
+  passwd <- CBytes.fromCString =<< (#peek clientid_t, passwd) ptr
+  pure $ HsClientID{clientId=client_id, clientPasswd=passwd}
+
 newtype ZooLogLevel = ZooLogLevel CInt
   deriving (Eq, Storable)
 
