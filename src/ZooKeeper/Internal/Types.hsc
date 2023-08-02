@@ -303,30 +303,33 @@ pattern ZooNoWatchingEvent = ZooEvent (#const ZOO_NOTWATCHING_EVENT)
 newtype CreateMode = CreateMode { unCreateMode :: CInt }
   deriving (Show, Eq, Storable)
 
--- TODO: The following C constants (such as ZOO_PERSISTENT, ZOO_PERSISTENT_SEQUENTIAL
---       and ZOO_EPTHMERAL_SEQUENTIAL) are not defined on clients <= 3.4.x. However,
---       they can be used by passing an integer directly.
+-- This a trick to determine whether the C library expose the following apis.
 --
---       The hard-coded ones will be replaced with the following patterns which use
---       C constants when the library only support clients >= 3.5.x.
+-- ZOO_VERSION was introduced by ZOOKEEPER-3635 (3.6.0-pre).
+--
+-- The following C constants (such as ZOO_PERSISTENT, ZOO_PERSISTENT_SEQUENTIAL
+-- and ZOO_EPTHMERAL_SEQUENTIAL) are not defined on clients <= 3.4.x.
+#ifdef ZOO_VERSION
 
---pattern ZooPersistent :: CreateMode
---pattern ZooPersistent = CreateMode (#const ZOO_PERSISTENT)
---
---pattern ZooPersistentSequential :: CreateMode
---pattern ZooPersistentSequential = CreateMode (#const ZOO_PERSISTENT_SEQUENTIAL)
---
---pattern ZooEphemeralSequential :: CreateMode
---pattern ZooEphemeralSequential = CreateMode (#const ZOO_EPHEMERAL_SEQUENTIAL)
---
---pattern ZooContainer :: CreateMode
---pattern ZooContainer = CreateMode (#const ZOO_CONTAINER)
---
---pattern ZooPersistentWithTTL :: CreateMode
---pattern ZooPersistentWithTTL = CreateMode (#const ZOO_PERSISTENT_WITH_TTL)
---
---pattern ZooPersistentSequentialWithTTL :: CreateMode
---pattern ZooPersistentSequentialWithTTL = CreateMode (#const ZOO_PERSISTENT_SEQUENTIAL_WITH_TTL)
+pattern ZooPersistent :: CreateMode
+pattern ZooPersistent = CreateMode (#const ZOO_PERSISTENT)
+
+pattern ZooPersistentSequential :: CreateMode
+pattern ZooPersistentSequential = CreateMode (#const ZOO_PERSISTENT_SEQUENTIAL)
+
+pattern ZooEphemeralSequential :: CreateMode
+pattern ZooEphemeralSequential = CreateMode (#const ZOO_EPHEMERAL_SEQUENTIAL)
+
+pattern ZooContainer :: CreateMode
+pattern ZooContainer = CreateMode (#const ZOO_CONTAINER)
+
+pattern ZooPersistentWithTTL :: CreateMode
+pattern ZooPersistentWithTTL = CreateMode (#const ZOO_PERSISTENT_WITH_TTL)
+
+pattern ZooPersistentSequentialWithTTL :: CreateMode
+pattern ZooPersistentSequentialWithTTL = CreateMode (#const ZOO_PERSISTENT_SEQUENTIAL_WITH_TTL)
+
+#else
 
 pattern ZooPersistent :: CreateMode
 pattern ZooPersistent = CreateMode 0
@@ -345,6 +348,8 @@ pattern ZooPersistentWithTTL = CreateMode 5
 
 pattern ZooPersistentSequentialWithTTL :: CreateMode
 pattern ZooPersistentSequentialWithTTL = CreateMode 6
+
+#endif
 
 -- | The znode will be deleted upon the client's disconnect.
 pattern ZooEphemeral :: CreateMode
