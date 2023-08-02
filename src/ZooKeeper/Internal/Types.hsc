@@ -197,12 +197,14 @@ newtype ZooState = ZooState CInt
   deriving newtype (Text.Print)
 
 instance Show ZooState where
-  show ZooExpiredSession   = "ExpiredSession"
-  show ZooAuthFailed       = "AuthFailed"
-  show ZooConnectingState  = "ConnectingState"
-  show ZooAssociatingState = "AssociatingState"
-  show ZooConnectedState   = "ConnectedState"
-  show (ZooState x)        = "ZooState " <> show x
+  show ZooExpiredSession    = "ExpiredSession"
+  show ZooAuthFailed        = "AuthFailed"
+  show ZooConnectingState   = "ConnectingState"
+  show ZooAssociatingState  = "AssociatingState"
+  show ZooConnectedState    = "ConnectedState"
+  show ZooReadonlyState     = "ReadonlyState"
+  show ZooNotconnectedState = "NotconnectedState"
+  show (ZooState x)         = "ZooState " <> show x
 
 pattern
     ZooExpiredSession, ZooAuthFailed
@@ -213,11 +215,28 @@ pattern ZooConnectingState  = ZooState (#const ZOO_CONNECTING_STATE)
 pattern ZooAssociatingState = ZooState (#const ZOO_ASSOCIATING_STATE)
 pattern ZooConnectedState   = ZooState (#const ZOO_CONNECTED_STATE)
 
--- TODO
--- pattern ZOO_READONLY_STATE :: ZooState
--- pattern ZOO_READONLY_STATE = ZooState (#const ZOO_READONLY_STATE)
--- pattern ZOO_NOTCONNECTED_STATE :: ZooState
--- pattern ZOO_NOTCONNECTED_STATE = ZooState (#const ZOO_NOTCONNECTED_STATE)
+-- This a trick to determine whether the C library expose the following apis.
+--
+-- ZOO_VERSION was introduced by ZOOKEEPER-3635 (3.6.0-pre). Also version after
+-- 3.6 exports the following states.
+#ifdef ZOO_VERSION
+
+pattern ZooReadonlyState :: ZooState
+pattern ZooReadonlyState = ZooState (#const ZOO_READONLY_STATE)
+
+pattern ZooNotconnectedState :: ZooState
+pattern ZooNotconnectedState = ZooState (#const ZOO_NOTCONNECTED_STATE)
+
+#else
+-- Hardcode for zookeeper-3.4
+
+pattern ZooReadonlyState :: ZooState
+pattern ZooReadonlyState = ZooState 5
+
+pattern ZooNotconnectedState :: ZooState
+pattern ZooNotconnectedState = ZooState 999
+
+#endif
 
 -------------------------------------------------------------------------------
 

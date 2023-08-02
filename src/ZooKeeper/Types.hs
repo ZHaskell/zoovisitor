@@ -39,6 +39,8 @@ module ZooKeeper.Types
   , pattern I.ZooConnectingState
   , pattern I.ZooAssociatingState
   , pattern I.ZooConnectedState
+  , pattern I.ZooReadonlyState
+  , pattern I.ZooNotconnectedState
 
   , I.CreateMode
   , pattern I.ZooPersistent
