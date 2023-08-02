@@ -12,14 +12,14 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        ghc: ['8.10.7', '9.0.2', '9.2.8']
-        cabal: ['3.6']
+        ghc: ['8.10.7', '9.0.2', '9.2.8', '9.4.5']
+        cabal: ['3.8']
         os: [ubuntu-latest, macOS-latest]
 
     name: ghc-${{ matrix.ghc }} cabal-${{matrix.cabal}} on ${{ matrix.os }}
 
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
 
       - uses: actions/cache@v2
         with:
@@ -53,7 +53,7 @@ jobs:
         run: sudo rm -rf /Library/Developer/CommandLineTools/SDKs
 
       - name: Setup Haskell
-        uses: haskell/actions/setup@v1
+        uses: haskell/actions/setup@v2
         with:
           ghc-version: ${{ matrix.ghc }}
           cabal-version: ${{ matrix.cabal }}
