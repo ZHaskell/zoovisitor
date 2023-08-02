@@ -7,8 +7,7 @@ module ZooKeeper.Internal.FFI where
 import           Control.Concurrent
 import           Control.Exception
 import           Control.Monad                (void)
-import           Data.Version                 (Version, makeVersion,
-                                               parseVersion)
+import           Data.Version                 (Version, makeVersion)
 import           Data.Word
 import           Foreign.C
 import           Foreign.ForeignPtr
@@ -16,7 +15,6 @@ import           Foreign.Ptr
 import           Foreign.StablePtr
 import           GHC.Conc
 import           GHC.Stack                    (HasCallStack)
-import           Text.ParserCombinators.ReadP (readP_to_S)
 import qualified Z.Data.CBytes                as CBytes
 import           Z.Foreign
 
@@ -25,15 +23,22 @@ import           ZooKeeper.Internal.Types
 
 #include "hs_zk.h"
 
+#ifndef ZOO_MAJOR_VERSION
+import           Data.Version                 (parseVersion)
+import           Text.ParserCombinators.ReadP (readP_to_S)
+#endif
+
 -------------------------------------------------------------------------------
 
 zooVersion :: Version
 #ifdef ZOO_MAJOR_VERSION
+-- For zookeeper-3.4
 zooVersion = makeVersion [ (#const ZOO_MAJOR_VERSION)
                          , (#const ZOO_MINOR_VERSION)
                          , (#const ZOO_PATCH_VERSION)
                          ]
 #else
+-- For zookeeper-3.6+
 zooVersion = case readP_to_S parseVersion (#const_str ZOO_VERSION) of
                [_, _, (r, _)] -> r
                otherwise      -> makeVersion [0, 0, 0]  -- unsupported
