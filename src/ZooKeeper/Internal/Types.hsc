@@ -64,6 +64,10 @@ pattern ZooLogWarn  = ZooLogLevel (#const ZOO_LOG_LEVEL_WARN)
 pattern ZooLogInfo  = ZooLogLevel (#const ZOO_LOG_LEVEL_INFO)
 pattern ZooLogDebug = ZooLogLevel (#const ZOO_LOG_LEVEL_DEBUG)
 
+-- | Disable logging
+pattern ZooLogSilence :: ZooLogLevel
+pattern ZooLogSilence = ZooLogLevel 0
+
 -------------------------------------------------------------------------------
 
 -- | ACL permissions.

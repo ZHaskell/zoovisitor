@@ -55,6 +55,7 @@ module ZooKeeper.Types
   , pattern I.ZooLogWarn
   , pattern I.ZooLogInfo
   , pattern I.ZooLogDebug
+  , pattern I.ZooLogSilence
 
   , I.ZooPerm
   , pattern I.ZooPermRead
