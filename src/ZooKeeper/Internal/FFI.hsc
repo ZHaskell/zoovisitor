@@ -41,7 +41,7 @@ zooVersion = makeVersion [ (#const ZOO_MAJOR_VERSION)
 -- For zookeeper-3.6+
 zooVersion = case readP_to_S parseVersion (#const_str ZOO_VERSION) of
                [_, _, (r, _)] -> r
-               otherwise      -> makeVersion [0, 0, 0]  -- unsupported
+               _otherwise     -> makeVersion [0, 0, 0]  -- unsupported
 #endif
 
 foreign import ccall unsafe "hs_zk.h &logLevel"
@@ -50,6 +50,12 @@ foreign import ccall unsafe "hs_zk.h &logLevel"
 -- | Sets the debugging level for the zookeeper library
 foreign import ccall unsafe "hs_zk.h zoo_set_debug_level"
   zooSetDebugLevel :: ZooLogLevel -> IO ()
+
+foreign import capi unsafe "zookeeper/zookeeper.h zoo_set_log_stream"
+  c_zoo_set_log_stream :: Ptr CFile -> IO ()
+
+foreign import ccall unsafe "hs_zoo_set_std_log_stream"
+  hs_zoo_set_std_log_stream :: CInt -> IO ()
 
 foreign import ccall "wrapper"
   mkCWatcherFnPtr :: CWatcherFn -> IO (FunPtr CWatcherFn)
@@ -239,6 +245,17 @@ foreign import ccall unsafe "zookeeper.h zoo_check_op_init"
 
 foreign import ccall unsafe "zookeeper.h is_unrecoverable"
   c_is_unrecoverable :: ZHandle -> IO CInt
+
+-------------------------------------------------------------------------------
+
+foreign import capi unsafe "stdio.h fopen"
+  c_fopen :: BA## Word8 -> BA## Word8 -> IO (Ptr CFile)
+
+foreign import capi unsafe "stdio.h fclose"
+  c_fclose :: Ptr CFile -> IO CInt
+
+foreign import capi unsafe "stdio.h fflush"
+  c_fflush :: Ptr CFile -> IO CInt
 
 -------------------------------------------------------------------------------
 -- Helpers

@@ -390,6 +390,18 @@ void hs_zoo_set_op_init(zoo_op_t* op, const char* path, const char* value,
 }
 
 // ----------------------------------------------------------------------------
+
+void hs_zoo_set_std_log_stream(int s) {
+  if (s == 1) {
+    zoo_set_log_stream(stdout);
+  } else if (s == 2) {
+    zoo_set_log_stream(stderr);
+  } else {
+    fprintf(stderr, "hs_zoo_set_std_log_stream: invalid %d\n", s);
+  }
+}
+
+// ----------------------------------------------------------------------------
 // Helpers
 
 const stat_t* dup_stat(const stat_t* old_stat) {
