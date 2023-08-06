@@ -1,6 +1,6 @@
 cabal-version:      2.2
 name:               zoovisitor
-version:            0.2.5.1
+version:            0.2.6.0
 synopsis:
   A haskell binding to Apache Zookeeper C library(mt) using Haskell Z project.
 
@@ -12,7 +12,7 @@ license-file:       LICENSE
 copyright:          Copyright (c)
 author:             mu
 maintainer:         mu@laxcat.xyz
-tested-with:        GHC ==8.10.7 || ==9.0.2 || ==9.2.8
+tested-with:        GHC ==8.10.7 || ==9.0.2 || ==9.2.8 || ==9.4.5
 category:           Database
 homepage:           https://github.com/ZHaskell/zoovisitor
 bug-reports:        https://github.com/ZHaskell/zoovisitor/issues
