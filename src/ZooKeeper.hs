@@ -1,10 +1,15 @@
 module ZooKeeper
   ( I.zooVersion
-  , I.zooSetDebugLevel
 
   , zookeeperResInit
   , U.withResource
   , U.Resource
+
+  , I.zooSetDebugLevel
+  , StdLogStream (..)
+  , zooSetStdLogStream
+  , FileLogStream
+  , withZooSetFileLogStream
 
   , zooCreate
   , zooCreateIfMissing
@@ -34,16 +39,18 @@ module ZooKeeper
   , zooRecvTimeout
   , isUnrecoverable
 
-    -- * Internal function (should NOT be used)
+    -- * Internal function
   , zookeeperInit
   , zookeeperClose
+  , openFileLogStream
+  , closeFileLogStream
   ) where
 
-import Control.Exception (catch)
+import           Control.Exception        (bracket, catch, throwIO)
 import           Control.Monad            (void, when, zipWithM, (<=<))
 import           Data.Bifunctor           (first)
 import           Data.Maybe               (fromMaybe)
-import           Foreign.C                (CInt)
+import           Foreign.C                (CFile, CInt)
 import           Foreign.Ptr              (FunPtr, Ptr, freeHaskellFunPtr,
                                            nullFunPtr, nullPtr, plusPtr)
 import           GHC.Stack                (HasCallStack)
@@ -747,3 +754,89 @@ zooState = I.c_zoo_state
 -- value may change after a server re-connect.
 zooRecvTimeout :: T.ZHandle -> IO CInt
 zooRecvTimeout = I.c_zoo_recv_timeout
+
+data StdLogStream = StdOutLogStream | StdErrLogStream
+
+newtype FileLogStream = FileLogStream (Ptr CFile)
+
+zooSetStdLogStream :: StdLogStream -> IO ()
+zooSetStdLogStream StdOutLogStream = I.hs_zoo_set_std_log_stream 1
+zooSetStdLogStream StdErrLogStream = I.hs_zoo_set_std_log_stream 2
+
+-- | Sets the file to be used by the library for logging.
+--
+-- The file will be closed after the computation you run, and the LogStream
+-- will be set to defaut stderr.
+--
+-- > let res = zookeeperResInit "127.0.0.1:2181" Nothing 5000 Nothing 0
+-- > withZooSetFileLogStream "/tmp/zk.log" "a+" $ do
+-- >   withResource res $ \zh -> do
+-- >     undefined
+withZooSetFileLogStream
+  :: CBytes
+  -- ^ File name, see 'openFileLogStream'
+  -> CBytes
+  -- ^ Mode, see 'openFileLogStream'
+  -> IO a
+  -- ^ Computation to run in-between
+  -> IO a
+withZooSetFileLogStream filename mode = bracket acquire release . const
+  where
+    acquire = do
+      new@(FileLogStream new') <- openFileLogStream filename mode
+      I.c_zoo_set_log_stream new'
+      pure new
+    -- FIXME: If zookeeper export the get LogStream api, then I can set back
+    -- to the original LogStream but the stderr.
+    release s = I.hs_zoo_set_std_log_stream 2 >> closeFileLogStream s
+
+-- | Open the file by filename using the given mode.
+--
+-- The operation may fail with IOError if open filed.
+--
+-- Also see: <https://man7.org/linux/man-pages/man3/fopen.3.html>
+openFileLogStream
+  :: CBytes
+  -- ^ File name
+  -> CBytes
+  -- ^ Mode
+  --
+  -- A string beginning with one of the following sequences:
+  --
+  -- r      Open text file for reading. The stream is positioned at
+  --        the beginning of the file.
+  --
+  -- r+     Open for reading and writing. The stream is positioned at
+  --        the beginning of the file.
+  --
+  -- w      Truncate file to zero length or create text file for
+  --        writing.  The stream is positioned at the beginning of the
+  --        file.
+  --
+  -- w+     Open for reading and writing. The file is created if it
+  --        does not exist, otherwise it is truncated. The stream is
+  --        positioned at the beginning of the file.
+  --
+  -- a      Open for appending (writing at end of file). The file is
+  --        created if it does not exist. The stream is positioned at
+  --        the end of the file.
+  --
+  -- a+     Open for reading and appending (writing at end of file).
+  --        The file is created if it does not exist. Output is
+  --        always appended to the end of the file.  POSIX is silent
+  --        on what the initial read position is when using this mode.
+  --        For glibc, the initial file position for reading is at the
+  --        beginning of the file, but for Android/BSD/MacOS, the
+  --        initial file position for reading is at the end of the
+  --        file.
+  -> IO FileLogStream
+openFileLogStream filename mode =
+  CBytes.withCBytesUnsafe filename $ \filename' ->
+  CBytes.withCBytesUnsafe mode $ \mode' -> do
+    cfilep <- I.c_fopen filename' mode'
+    if (cfilep == nullPtr)
+       then throwIO $ userError ("Open file " <> CBytes.unpack filename <> " failed!")
+       else pure $ FileLogStream cfilep
+
+closeFileLogStream :: FileLogStream -> IO ()
+closeFileLogStream (FileLogStream p) = I.c_fflush p >> void (I.c_fclose p)
