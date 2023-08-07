@@ -26,7 +26,10 @@ jobs:
       - name: Setup Haskell
         uses: haskell/actions/setup@v2
         with:
-          ghc-version: 9.2
+          # can't build docs on ghc-9.2 with cabal-3.8, see
+          # - https://github.com/haskell/cabal/issues/8104
+          # - https://github.com/haskell/haddock/issues/1582
+          ghc-version: 9.4
           cabal-version: 3.8
 
       - name: Install zookeeper-dev on ubuntu
