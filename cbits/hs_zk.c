@@ -411,7 +411,7 @@ const stat_t* dup_stat(const stat_t* old_stat) {
 }
 
 const string_vector_t* dup_string_vector(const string_vector_t* old_strings) {
-  int count = old_strings->count;
+  int32_t count = old_strings->count;
   if (count < 0) {
     fprintf(stderr, "dup_string_vector error: count %d\n", count);
     return NULL;
@@ -419,7 +419,7 @@ const string_vector_t* dup_string_vector(const string_vector_t* old_strings) {
   string_vector_t* new_strings =
       (string_vector_t*)malloc(sizeof(string_vector_t));
   char** vals = malloc(count * sizeof(char*));
-  for (int i = 0; i < count; ++i) {
+  for (int32_t i = 0; i < count; ++i) {
     vals[i] = strdup(old_strings->data[i]);
   }
   new_strings->count = count;
@@ -427,15 +427,28 @@ const string_vector_t* dup_string_vector(const string_vector_t* old_strings) {
   return new_strings;
 }
 
+void free_string_vector(string_vector_t* strings) {
+  if (strings == NULL || strings->data == NULL) {
+    return;
+  }
+
+  for (int32_t i = 0; i < strings->count; ++i) {
+    free(strings->data[i]);
+  }
+  free(strings->data);
+  strings->data = NULL;
+  free(strings);
+}
+
 const acl_vector_t* dup_acl_vector(const acl_vector_t* old_acls) {
-  int count = old_acls->count;
+  int32_t count = old_acls->count;
   if (count < 0) {
     fprintf(stderr, "dup_acl_vector error: count %d\n", count);
     return NULL;
   }
   acl_t* data = (acl_t*)malloc(count * sizeof(acl_t));
   acl_t* old_data = old_acls->data;
-  for (int i = 0; i < count; ++i) {
+  for (int32_t i = 0; i < count; ++i) {
     data[i].perms = old_data[i].perms;
     data[i].id.scheme = strdup(old_data[i].id.scheme);
     data[i].id.id = strdup(old_data[i].id.id);
@@ -445,4 +458,16 @@ const acl_vector_t* dup_acl_vector(const acl_vector_t* old_acls) {
   new_acls->count = count;
   new_acls->data = data;
   return new_acls;
+}
+
+void free_acl_vector(acl_vector_t* acls) {
+  if (acls == NULL || acls->data == NULL) {
+    return;
+  }
+  for (int32_t i = 0; i < acls->count; ++i) {
+    free(acls->data[i].id.id);
+    free(acls->data[i].id.scheme);
+  }
+  free(acls->data);
+  free(acls);
 }

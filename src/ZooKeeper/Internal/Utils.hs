@@ -1,6 +1,6 @@
 module ZooKeeper.Internal.Utils
   ( -- * Resource management
-    Resource(..)
+    Resource (..)
   , initResource
   , initResource_
   , withResource

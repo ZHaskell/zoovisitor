@@ -1,4 +1,4 @@
-cabal-version:      2.2
+cabal-version:      3.6
 name:               zoovisitor
 version:            0.2.6.0
 synopsis:
@@ -27,6 +27,21 @@ source-repository head
   type:     git
   location: https://github.com/ZHaskell/zoovisitor
 
+flag zoovisitor_enable_asan
+  default:     False
+  description: Enable AddressSanitizer.
+
+-- XXX: Tricky options to link static archive, see: https://github.com/haskell/cabal/issues/4677
+common link-asan
+  if os(osx)
+    ghc-options: "-optl-Wl,-lasan"
+
+  if !os(osx)
+    ghc-options:
+      -pgml g++ "-optl-Wl,--allow-multiple-definition"
+      "-optl-Wl,--whole-archive" "-optl-Wl,-Bstatic" "-optl-Wl,-lasan"
+      "-optl-Wl,-Bdynamic" "-optl-Wl,--no-whole-archive"
+
 library
   hs-source-dirs:     src
   exposed-modules:
@@ -54,6 +69,15 @@ library
   include-dirs:       include /usr/local/include
   build-tool-depends: hsc2hs:hsc2hs
   extra-libraries:    zookeeper_mt
+
+  if flag(zoovisitor_enable_asan)
+    cc-options:
+      -fsanitize=address -fno-omit-frame-pointer -static-libasan
+
+    hsc2hs-options:
+      "--cflag=-fsanitize=address" "--lflag=-fsanitize=address"
+      "--cflag=-static-libasan" "--lflag=-static-libasan"
+
   default-language:   Haskell2010
   default-extensions:
     BangPatterns
@@ -80,6 +104,9 @@ library
     -Wincomplete-uni-patterns -Wpartial-fields -Wredundant-constraints
 
 test-suite zoovisitor-test
+  if flag(zoovisitor_enable_asan)
+    import: link-asan
+
   type:             exitcode-stdio-1.0
   main-is:          Spec.hs
   hs-source-dirs:   test

@@ -3,7 +3,7 @@
 
 module ZooKeeper.Internal.Types where
 
-import           Control.Exception     (bracket_)
+import           Control.Exception     (finally)
 import           Control.Monad         (forM)
 import           Data.ByteString.Short (ShortByteString)
 import qualified Data.ByteString.Short as BShort (packCStringLen)
@@ -115,29 +115,38 @@ data ZooAcl = ZooAcl
   { aclPerms    :: [ZooPerm]
   , aclIdScheme :: CBytes
   , aclId       :: CBytes
-  } deriving Show
+  } deriving (Show, Eq)
 
-{-# INLINE sizeOfZooAcl #-}
 sizeOfZooAcl :: Int
 sizeOfZooAcl = (#size acl_t)
+{-# INLINE sizeOfZooAcl #-}
 
-peekZooAcl :: Ptr ZooAcl -> IO ZooAcl
-peekZooAcl ptr = do
-  perms <- toZooPerms <$> (#peek acl_t, perms) ptr
-  scheme_ptr <- (#peek acl_t, id.scheme) ptr
-  id_ptr <- (#peek acl_t, id.id) ptr
-  scheme <- CBytes.fromCString scheme_ptr <* free scheme_ptr
-  acl_id <- CBytes.fromCString id_ptr <* free id_ptr
+newtype AclVector = AclVector (Ptr ())
+  deriving (Show, Eq)
+
+peekAclVector :: AclVector -> IO [ZooAcl]
+peekAclVector p@(AclVector ptr) = flip finally (free_acl_vector p) $ do
+  count <- fromIntegral @Int32 <$> (#peek acl_vector_t, count) ptr
+  data_ptr <- (#peek acl_vector_t, data) ptr
+  forM [0..count-1] $ peekAclVectorIdx data_ptr
+
+peekAclVectorIdx :: Ptr ZooAcl -> Int -> IO ZooAcl
+peekAclVectorIdx ptr offset = do
+  let ptr' = ptr `plusPtr` (offset * sizeOfZooAcl)
+  perms <- toZooPerms <$> (#peek acl_t, perms) ptr'
+  scheme_ptr <- (#peek acl_t, id.scheme) ptr'
+  id_ptr <- (#peek acl_t, id.id) ptr'
+  scheme <- CBytes.fromCString scheme_ptr
+  acl_id <- CBytes.fromCString id_ptr
   return $ ZooAcl perms scheme acl_id
 
 -- TODO
 unsafeAllocaZooAcl :: ZooAcl -> IO Z.ByteArray
 unsafeAllocaZooAcl = undefined
 
--- FIXME: consider this
--- data AclVector = AclVector (Ptr ()) | AclList [ZooAcl]
-newtype AclVector = AclVector (Ptr ())
-  deriving (Show, Eq)
+-- TODO
+fromAclList :: [ZooAcl] -> IO AclVector
+fromAclList = undefined
 
 -- | This is a completely open ACL
 foreign import ccall unsafe "hs_zk.h &ZOO_OPEN_ACL_UNSAFE"
@@ -151,17 +160,8 @@ foreign import ccall unsafe "hs_zk.h &ZOO_READ_ACL_UNSAFE"
 foreign import ccall unsafe "hs_zk.h &ZOO_CREATOR_ALL_ACL"
   zooCreatorAllAcl :: AclVector
 
-toAclList :: AclVector -> IO [ZooAcl]
-toAclList (AclVector ptr) = do
-  count <- fromIntegral @Int32 <$> (#peek acl_vector_t, count) ptr
-  data_ptr <- (#peek acl_vector_t, data) ptr
-  forM [0..count-1] $ \idx -> do
-    let data_ptr' = data_ptr `plusPtr` (idx * sizeOfZooAcl)
-    peekZooAcl data_ptr'
-
--- TODO
-fromAclList :: [ZooAcl] -> IO AclVector
-fromAclList = undefined
+foreign import ccall unsafe "free_acl_vector"
+  free_acl_vector :: AclVector -> IO ()
 
 -------------------------------------------------------------------------------
 
@@ -395,8 +395,9 @@ peekStat ptr = peekStat' ptr <* free ptr
 newtype StringVector = StringVector { unStrVec :: [CBytes] }
   deriving Show
 
+-- Peek a StringVector from point and then free the pointer
 peekStringVector :: Ptr StringVector -> IO StringVector
-peekStringVector ptr = bracket_ (return ()) (free ptr) $ do
+peekStringVector ptr = flip finally (free_string_vector ptr) $ do
   -- NOTE: Int32 is necessary, since count is int32_t in c
   count <- fromIntegral @Int32 <$> (#peek string_vector_t, count) ptr
   StringVector <$> forM [0..count-1] (peekStringVectorIdx ptr)
@@ -405,7 +406,10 @@ peekStringVectorIdx :: Ptr StringVector -> Int -> IO CBytes
 peekStringVectorIdx ptr offset = do
   ptr' <- (#peek string_vector_t, data) ptr
   data_ptr <- peek $ ptr' `plusPtr` (offset * (sizeOf ptr'))
-  CBytes.fromCString data_ptr <* free data_ptr
+  CBytes.fromCString data_ptr  -- this will do a copy
+
+foreign import ccall unsafe "free_string_vector"
+  free_string_vector :: Ptr StringVector -> IO ()
 
 -------------------------------------------------------------------------------
 -- Callback datas
@@ -520,7 +524,7 @@ instance Completion AclCompletion where
   csize = (#size hs_acl_completion_t)
   peekRet ptr = (#peek hs_acl_completion_t, rc) ptr
   peekData ptr = do
-    acls <- toAclList . AclVector =<< (#peek hs_acl_completion_t, acl) ptr
+    acls <- peekAclVector . AclVector =<< (#peek hs_acl_completion_t, acl) ptr
     stat_ptr <- (#peek hs_acl_completion_t, stat) ptr
     stat <- peekStat stat_ptr
     return $ AclCompletion acls stat
