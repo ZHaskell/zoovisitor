@@ -9,22 +9,21 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
           submodules: 'recursive'
 
-      - uses: actions/cache@v2
+      - uses: actions/cache@v4
         with:
           path: |
             ~/.cabal/packages
             ~/.cabal/store
-            dist-newstyle
           key: ${{ runner.os }}-${{ hashFiles('**/*.cabal') }}
           restore-keys: |
             ${{ runner.os }}-
 
       - name: Setup Haskell
-        uses: haskell/actions/setup@v2
+        uses: haskell-actions/setup@v2
         with:
           # can't build docs on ghc-9.2 with cabal-3.8, see
           # - https://github.com/haskell/cabal/issues/8104
