@@ -21,14 +21,18 @@ import           ZooKeeper.Types
 recvTimeout :: CInt
 recvTimeout = 5000
 
+testZkHost :: CB.CBytes
+testZkHost = "127.0.0.1:2182"
+
 client :: Resource ZHandle
-client = zookeeperResInit "127.0.0.1:2182" Nothing recvTimeout Nothing 0
+client = zookeeperResInit testZkHost Nothing recvTimeout Nothing 0
 
 main :: IO ()
 main = withResource client $ \zh -> do
   hspec $ opSpec zh
   hspec $ multiOpSpec zh
   hspec $ propSpec zh
+  hspec $ miscSpec zh
   hspec $ electionSpec1 zh
   hspec $ electionSpec2 client
   hspec $ lockSpec1 zh
@@ -91,7 +95,7 @@ opSpec zh = do
     -- https://issues.apache.org/jira/browse/ZOOKEEPER-834
     it "create children of ephemeral nodes should throw exception" $ do
       void $ zooCreate zh "/x" Nothing zooOpenAclUnsafe ZooEphemeral
-      zooCreate zh "/x/1" Nothing zooOpenAclUnsafe ZooEphemeral `shouldThrow` noChildrenForEphemerals
+      zooCreate zh "/x/1" Nothing zooOpenAclUnsafe ZooEphemeral `shouldThrow` noChildrenForEphemeralsEx
 
     it "get children of a leaf node should return []" $ do
       void $ zooCreate zh "/y" Nothing zooOpenAclUnsafe ZooPersistent
@@ -186,6 +190,22 @@ electionSpec2 client_ = describe "ZooKeeper.zooElection (multi sessions)" $ do
     takeMVar finished4
     readMVar leader `shouldReturn` (2 :: Int)
 
+miscSpec :: ZHandle -> Spec
+miscSpec zh = describe "Misc" $ do
+  -- TODO: add a timeout to this test (should be impl with forkOS instead of forkIO)
+  it "call zooGet in global watcher should not block" $ do
+    let nodeName = "/test-misc-node"
+    void $ zooCreate zh nodeName Nothing zooOpenAclUnsafe ZooEphemeral
+    void $ zooSet zh nodeName (Just "hello") Nothing
+
+    mvar <- newEmptyMVar
+    let gloWatcher zh1 _event _state _path = do
+          r <- zooGet zh1 nodeName
+          void $ tryPutMVar mvar r
+    let client1 = zookeeperResInit testZkHost (Just gloWatcher) recvTimeout Nothing 0
+    withResource client1 $ \_zh1 -> do
+      (dataCompletionValue <$> takeMVar mvar) `shouldReturn` Just "hello"
+
 lockSpec1 :: ZHandle -> Spec
 lockSpec1 zh = describe "ZooKeeper.zooLock (single session)" $ do
   it "Test single client situation" $ do
@@ -225,5 +245,8 @@ lockSpec2 client_ = describe "ZooKeeper.zooLock (multi sessions)" $ do
 
 -------------------------------------------------------------------------------
 
-noChildrenForEphemerals :: Selector ZNOCHILDRENFOREPHEMERALS
-noChildrenForEphemerals = const True
+noChildrenForEphemeralsEx :: Selector ZNOCHILDRENFOREPHEMERALS
+noChildrenForEphemeralsEx = const True
+
+nodeExistsEx :: Selector ZNODEEXISTS
+nodeExistsEx = const True
