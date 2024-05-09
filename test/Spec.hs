@@ -37,10 +37,10 @@ main = withResource client $ \zh -> do
 opSpec :: ZHandle -> Spec
 opSpec zh = do
   describe "ZooKeeper.zooVersion" $ do
-    it "version should be 3.4.* - 3.8.*" $ do
+    it "version should be 3.4.* - 3.9.*" $ do
       putStrLn $ "Tested with zooVersion: " <> show zooVersion
       zooVersion `shouldSatisfy` (>= makeVersion [3, 4, 0])
-      zooVersion `shouldSatisfy` (<= makeVersion [3, 8, 0])
+      zooVersion `shouldSatisfy` (< makeVersion [3, 10, 0])
 
   describe "zookeeper get set" $ do
     it "set some value to a node and get it" $ do

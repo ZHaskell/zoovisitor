@@ -7,21 +7,56 @@ on:
     branches: [main]
 
 jobs:
-
   build:
     runs-on: ${{ matrix.os }}
     strategy:
+      fail-fast: false
       matrix:
-        ghc: ['8.10.7', '9.0.2', '9.2.8', '9.4.5']
-        cabal: ['3.8']
+        ghc: ["8.10.7", "9.0.2", "9.2.8", "9.4.8"]
+        cabal: ["3.10"]
+        # TODO:
+        # zk_server: ["3.4.14", "3.6.2"]
+        # zk_client: ["3.4.14", "3.6.2"]
         os: [ubuntu-latest, macOS-latest]
 
-    name: ghc-${{ matrix.ghc }} cabal-${{matrix.cabal}} on ${{ matrix.os }}
+    name: ghc-${{ matrix.ghc }} on ${{ matrix.os }}
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
-      - uses: actions/cache@v2
+      # FIXME: use the same client version as the one in the matrix
+      - name: Install zookeeper-dev on ubuntu
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install libzookeeper-mt-dev
+      # FIXME: use the same server & client version as the one in the matrix
+      - name: Install zookeeper-dev on osx
+        if: runner.os == 'macOS'
+        run: brew install zookeeper
+
+      # FIXME: use the same server version as the one in the matrix
+      - name: Setup zookeeper server on ubuntu
+        if: runner.os == 'Linux'
+        run: docker run --name some-zookeeper -p 2182:2181 -d zookeeper:3.6
+      - name: Setup zookeeper server on osx
+        if: runner.os == 'macOS'
+        run: |
+          # https://docs.brew.sh/Installation
+          if [ "$(uname -m)" == "arm64" ]; then
+            sed -i'.bak' -e "s/^clientPort=2181$/clientPort=2182/g" /opt/homebrew/etc/zookeeper/zoo.cfg
+            cat /opt/homebrew/etc/zookeeper/zoo.cfg
+          else
+            sed -i'.bak' -e "s/^clientPort=2181$/clientPort=2182/g" /usr/local/etc/zookeeper/zoo.cfg
+            cat /usr/local/etc/zookeeper/zoo.cfg
+          fi
+          zkServer start
+
+      - name: Setup Haskell
+        uses: haskell-actions/setup@v2
+        with:
+          ghc-version: ${{ matrix.ghc }}
+          cabal-version: ${{ matrix.cabal }}
+
+      - uses: actions/cache@v4
         with:
           path: |
             ~/.cabal/packages
@@ -30,33 +65,6 @@ jobs:
           key: ${{ runner.os }}-${{ matrix.ghc }}-${{ matrix.cabal }}-v1-${{ hashFiles('**/*.cabal') }}-${{ hashFiles('**/cabal.project') }}
           restore-keys: |
             ${{ runner.os }}-${{ matrix.ghc }}-${{ matrix.cabal }}-v1-
-
-      - name: Install zookeeper-dev on ubuntu
-        if: runner.os == 'Linux'
-        run: sudo apt-get update && sudo apt-get install libzookeeper-mt-dev
-      - name: Install zookeeper-dev on osx
-        if: runner.os == 'macOS'
-        run: brew install zookeeper
-
-      - name: Setup zookeeper server on ubuntu
-        if: runner.os == 'Linux'
-        run: docker run --name some-zookeeper -p 2182:2181 -d zookeeper
-      - name: Setup zookeeper server on osx
-        if: runner.os == 'macOS'
-        run: |
-          sed -i'.bak' -e "s/^clientPort=2181$/clientPort=2182/g" /usr/local/etc/zookeeper/zoo.cfg
-          cat /usr/local/etc/zookeeper/zoo.cfg
-          zkServer start
-
-      - name: remove xcode devtools on osx
-        if: runner.os == 'macOS'
-        run: sudo rm -rf /Library/Developer/CommandLineTools/SDKs
-
-      - name: Setup Haskell
-        uses: haskell/actions/setup@v2
-        with:
-          ghc-version: ${{ matrix.ghc }}
-          cabal-version: ${{ matrix.cabal }}
 
       - name: sdist
         run: |
@@ -68,14 +76,33 @@ jobs:
           rm -rf $GITHUB_WORKSPACE/*
           find $HOME/sdist -maxdepth 1 -type f -name '*.tar.gz' -exec tar -C $GITHUB_WORKSPACE -xzvf {} --strip 1 \;
 
+      - name: setup
+        run: |
+          if [ "$RUNNER_OS" == "macOS" ]; then
+            if [ "$(uname -m)" == "arm64" ]; then
+              echo "BUILD_ARGS=--extra-include-dirs=/opt/homebrew/include --extra-lib-dirs=/opt/homebrew/lib" >> $GITHUB_ENV
+
+              ghc_version=$(echo "${{ matrix.ghc }}" | cut -d'.' -f1-2)
+              if [ "$ghc_version" == "8.10" ] || [ "$ghc_version" == "9.0" ]; then
+                brew install llvm@12
+                echo "$(brew --prefix llvm@12)/bin" >> $GITHUB_PATH
+                # https://gitlab.haskell.org/ghc/ghc/-/issues/20592
+                echo "C_INCLUDE_PATH=$(xcrun --show-sdk-path)/usr/include/ffi" >> $GITHUB_ENV
+              else
+                echo "$(brew --prefix llvm@15)/bin" >> $GITHUB_PATH
+              fi
+            fi
+          fi
+
       - name: build
-        run: cabal build --upgrade-dependencies --enable-tests --enable-benchmarks
+        run: cabal build $BUILD_ARGS --upgrade-dependencies --enable-tests --enable-benchmarks
 
       - name: test
-        run: cabal test --test-show-details=always
+        run: cabal test $BUILD_ARGS --enable-tests --test-show-details=always
+        timeout-minutes: 5
 
       - name: check
         run: cabal check
 
       - name: haddock
-        run: cabal haddock
+        run: cabal $BUILD_ARGS haddock
