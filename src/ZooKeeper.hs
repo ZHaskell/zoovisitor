@@ -76,8 +76,9 @@ zookeeperResInit
   -- server. e.g. "127.0.0.1:3000,127.0.0.1:3001,127.0.0.1:3002"
   -> Maybe T.WatcherFn
   -- ^ the global watcher callback function. When notifications are
-  -- triggered this function will be invoked. FIXME: Calling any zoo operations
-  -- (e.g. zooGet) will cause an infinite block.
+  -- triggered this function will be invoked.
+  --
+  -- Note that each callback will be called in a different thread of execution.
   -> CInt
   -- ^ session expiration time in milliseconds
   -> Maybe T.ClientID
@@ -700,8 +701,9 @@ zookeeperInit
   -- server. e.g. "127.0.0.1:3000,127.0.0.1:3001,127.0.0.1:3002"
   -> Maybe T.WatcherFn
   -- ^ the global watcher callback function. When notifications are
-  -- triggered this function will be invoked. FIXME: Calling any zoo operations
-  -- (e.g. zooGet) will cause an infinite block.
+  -- triggered this function will be invoked.
+  --
+  -- Note that each callback will be called in a different thread of execution.
   -> CInt
   -- ^ session expiration time in milliseconds
   -> Maybe T.ClientID

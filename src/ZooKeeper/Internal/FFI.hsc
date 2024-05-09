@@ -63,7 +63,35 @@ foreign import ccall "wrapper"
 mkWatcherFnPtr :: WatcherFn -> IO (FunPtr CWatcherFn)
 mkWatcherFnPtr fn = mkCWatcherFnPtr $ \zh ev st cpath _ctx -> do
   path <- CBytes.fromCString cpath
-  fn zh (ZooEvent ev) (ZooState st) path
+  -- FIXME: better way
+  --
+  -- Here we fork a new thread to run the user's watcher function to avoid
+  -- blocking the C thread, potential deadlock.
+  --
+  -- Without forkIO, the following code will deadlock,
+  --
+  -- @
+  -- gloWatcher :: WatcherFn
+  -- gloWatcher zh event state path = do
+  --   print =<< zooGet zh "/node"
+  --
+  -- zookeeperResInit "127.0.0.1:2181" (Just gloWatcher) 5000 Nothing 0
+  -- ...
+  -- @
+  --
+  -- The reason is:
+  --
+  --   * All zookeeper completions are run by one completion c thread (or
+  --     likely in one thread).
+  --   * We are blocking on a MVar and waiting for the callback of zoo_aget
+  --     return.
+  --   * gloWatcher will be called by zookeeper library as a c function, which
+  --     means any blocking in haskell code will block the c thread.
+  --
+  -- So, zooGet is waiting for the result of zoo_aget, and blocking on an MVar,
+  -- which will block the completion c thread here. The result of zoo_aget is
+  -- returned by this completion c thread, so it will never be called.
+  void $ forkIO $ fn zh (ZooEvent ev) (ZooState st) path
 
 foreign import ccall safe "zookeeper.h zookeeper_init"
   zookeeper_init
